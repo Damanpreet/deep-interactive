@@ -6,24 +6,25 @@ This script computes a segmentation mask for a given image.
 from __future__ import print_function
 
 import argparse
-from datetime import datetime
+# from datetime import datetime
 import os
-import sys
-import time
-
-from PIL import Image
-
+# import sys
+# import time
+import pdb
+# import cv2
+from matplotlib import image #, cm
+from tifffile import imread as tiff_imread
 import tensorflow as tf
 import numpy as np
 
-from deeplab_resnet import DeepLabResNetModel, ImageReader, decode_labels, prepare_label
+from deeplab_resnet import DeepLabResNetModel #, decode_labels, prepare_label
 
 SAVE_DIR = './output/'
-IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434), dtype=np.float32)
+IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434, 156.042324, 156.523433), dtype=np.float32)
 
 def get_arguments():
     """Parse all the arguments provided from the CLI.
-    
+
     Returns:
       A list of parsed arguments.
     """
@@ -38,63 +39,83 @@ def get_arguments():
 
 def load(saver, sess, ckpt_path):
     '''Load trained weights.
-    
+
     Args:
       saver: TensorFlow saver object.
       sess: TensorFlow session.
       ckpt_path: path to checkpoint file with parameters.
-    ''' 
+    '''
     saver.restore(sess, ckpt_path)
     print("Restored model parameters from {}".format(ckpt_path))
 
 def main():
     """Create the model and start the evaluation process."""
     args = get_arguments()
-    
+
     # Prepare image.
-    img = tf.image.decode_jpeg(tf.read_file(args.img_path), channels=3)
-    # Convert RGB to BGR.
-    img_r, img_g, img_b = tf.split(split_dim=2, num_split=3, value=img)
-    img = tf.cast(tf.concat(2, [img_b, img_g, img_r]), dtype=tf.float32)
+    img = tiff_imread(args.img_path)
+    img = np.transpose(img, [1,2,0])
+    # img = cv2.imread(args.img_path) #tf.image.decode_jpeg(tf.read_file(args.img_path), channels=3)
+    h, w, ch = img.shape
+
     # Extract mean.
-    img -= IMG_MEAN 
-    
+    img = np.float32(img) - IMG_MEAN
+
     # Create network.
-    net = DeepLabResNetModel({'data': tf.expand_dims(img, dim=0)}, is_training=False)
+    with tf.device('/gpu:1'):
+        input_img = tf.placeholder(tf.float32, shape=[1, h, w, ch], name='input_img')
+        net = DeepLabResNetModel({'data': tf.expand_dims(img, dim=0)}, is_training=False)
 
-    # Which variables to load.
-    restore_var = tf.global_variables()
+        # Which variables to load.
+        restore_var = tf.global_variables()
 
-    # Predictions.
-    raw_output = net.layers['fc1_voc12']
-    raw_output_up = tf.image.resize_bilinear(raw_output, tf.shape(img)[0:2,])
-    raw_output_up = tf.argmax(raw_output_up, dimension=3)
-    pred = tf.expand_dims(raw_output_up, dim=3)
+        # Predictions.
+        raw_output = net.layers['fc1_voc12']
+        raw_output_up = tf.image.resize_bilinear(raw_output, tf.shape(img)[0:2,])
+        # pred = tf.expand_dims(raw_output_up, dim=3)
 
-    
-    # Set up TF session and initialize variables. 
+    # Set up TF session and initialize variables.
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
+    config.allow_soft_placement = True
     sess = tf.Session(config=config)
-    init = tf.global_variables_initializer()
-    
-    sess.run(init)
-    
+    sess.run(tf.global_variables_initializer())
+    print('before run inference run.\n')
+
     # Load weights.
     loader = tf.train.Saver(var_list=restore_var)
     load(loader, sess, args.model_weights)
-    
+
+    '''
+    param_0 = sess.run(restore_var)
+    loader.restore(sess, './snapshots/model.ckpt-0')
+    param_1 = sess.run(restore_var)
+    max_diff = 0
+    max_k    = 0
+    for k in range(len(param_0)):
+        diff = np.max(param_0[k]-param_1[k])
+        if diff > max_diff:
+            max_diff = diff
+            max_k = k
+
+    print("max_k = ", max_k, " max_diff= ", max_diff)
+    '''
+    pdb.set_trace()
+
+
     # Perform inference.
-    preds = sess.run(pred)
-    
-    msk = decode_labels(preds)
-    im = Image.fromarray(msk[0])
+    preds = sess.run(raw_output_up, feed_dict={input_img:img[np.newaxis, ...]})
+    preds = preds.squeeze()
+
+    # msk = decode_labels(preds)
+    # im = Image.fromarray(msk[0])
     if not os.path.exists(args.save_dir):
         os.makedirs(args.save_dir)
-    im.save(args.save_dir + 'mask.png')
-    
+    # cv2.imwrite(args.save_dir+'mask.png', preds)
+    image.imsave(args.save_dir+'mask.png', preds) # ,cmap = cm.grey, vmin=0, vmax=255 )
+
     print('The output file has been saved to {}'.format(args.save_dir + 'mask.png'))
 
-    
+
 if __name__ == '__main__':
     main()

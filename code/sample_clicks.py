@@ -2,7 +2,7 @@ import os.path as osp
 import os
 from cfg.config import cfg
 import cv2
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import numpy as np
 import pdb
 import random as ran
@@ -21,7 +21,7 @@ def load_image_path(img_dir, img_ext):
         print('No image directory provided.')
         return images
 
-    txt_path = osp.join(cfg.DATA_DIR, 'PASCAL','train.txt')
+    txt_path = osp.join(cfg.DATA_DIR, 'train.txt')
     with open(txt_path, 'r') as fp:
         for line in fp:
             # truncate /n character
@@ -180,15 +180,15 @@ def _filter_samples(path, is_fixed, morphology, num=cfg.N_POS):
     return locs
 
 
-def pos_strategy(path):
+def pos_strategy(path, num_poss=cfg.N_POS):
     '''Positive points sampling strategy.
     @path: image path
     @output: a dictionary of sampled negative points
     '''
-    return _filter_samples(path, False, _erosion)
+    return _filter_samples(path, False, _erosion, num_poss)
 
 
-def neg_strategy1(path, num_negs=10):
+def neg_strategy1(path, num_negs=cfg.N_NEG):
     '''Negative points sampling strategy 1.
     @num_negs: number of negative points needed to be sampled
     @path: image path
@@ -197,7 +197,7 @@ def neg_strategy1(path, num_negs=10):
     return _filter_samples(path, False, _dilation_and_remove, num_negs)
 
 
-def neg_strategy2(path, num_negs=5):
+def neg_strategy2(path, num_negs=cfg.N_NEG):
     '''Negative points sampling strategy 2.
     @num_negs: number of negative points needed to be sampled
     @path: idef f(x):
@@ -254,7 +254,7 @@ def neg_strategy2(path, num_negs=5):
 
     return locs
 
-def neg_strategy3(path, num_negs=10):
+def neg_strategy3(path, num_negs=cfg.N_NEG):
     '''Negative points sampling strategy 3.
     @num_negs: number of negative points needed to be sampled
     @path: image path
@@ -284,24 +284,20 @@ def cat_channels(image, gt):
     #print(img_arr.shape)
 
     for n in range(cfg.N_PAIRS):
-
         pos_samples = pos_strategy(gt)
 
 
-        neg_samples = [neg_strategy1, neg_strategy2, neg_strategy3]
-
-        idx = n // (cfg.N_PAIRS)
-
-        neg_samples = neg_samples[idx](gt)
-
+        # neg_samples = [neg_strategy1, neg_strategy2, neg_strategy3]
+        # idx = n // (cfg.N_PAIRS)
+        # neg_samples = neg_samples[idx](gt)
 
         pos_energies = construct_channels(pos_samples, h, w)
-
-        neg_energies = construct_channels(neg_samples, h, w)
+        # neg_energies = construct_channels(neg_samples, h, w)
 
 
         for obj in pos_samples:
-            pairs = np.concatenate((img_arr, pos_energies[obj], neg_energies[obj]), axis=2)
+            # pairs = np.concatenate((img_arr, pos_energies[obj], neg_energies[obj]), axis=2)
+            pairs = np.concatenate((img_arr, pos_energies[obj]), axis=2)
             label = gt_arr * (gt_arr == obj)
             res['data'].append(pairs)
             res['labels'].append(label)
@@ -328,7 +324,7 @@ def construct_channels(samples, h, w):
             x_vec -= p[1]
 
             intermedia = np.power(y_vec,2) + np.power(x_vec.T, 2)
-            intermedia = np.sqrt(intermedia)
+            intermedia = np.sqrt(intermedia)*cfg.ENERGY_SCALE
 
             intermedia[intermedia > 255] = 255
 
@@ -347,7 +343,7 @@ def argparser():
     ''' Parse all arguments provided from the command line tool(CLT)
     '''
     parser = argparse.ArgumentParser(description='Convert images to five channels mapping.')
-    parser.add_argument('--save-dir', type=str, default='converted', help="Directory to store converted tiff files")
+    parser.add_argument('--save-dir', type=str, default='converted_pos', help="Directory to store converted tiff files")
     return parser.parse_args()
 
 
@@ -379,6 +375,8 @@ def main():
 
 
     for idx, (image, gt, fn) in enumerate(zip(images, gts, filenames)):
+        if idx > 3000:
+            break
 
         pairs = cat_channels(image, gt)
 

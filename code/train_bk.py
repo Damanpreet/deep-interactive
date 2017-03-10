@@ -17,28 +17,28 @@ which contains approximately 10000 images for training and 1500 images for valid
 from __future__ import print_function
 
 import argparse
-# from datetime import datetime
+from datetime import datetime
 import os
-# import os.path as osp
-# import sys
+import os.path as osp
+import sys
 import time
 import pdb
 import tensorflow as tf
-# import numpy as np
+import numpy as np
 
-from deeplab_resnet import DeepLabResNetModel,image_reader, decode_labels, inv_preprocess, prepare_label
+from deeplab_resnet import DeepLabResNetModel, image_reader, decode_labels, inv_preprocess, prepare_label
 
 n_classes = 1
 
-BATCH_SIZE = 8
-DATA_DIRECTORY = ''#'/home/yuanjial/DataSet/PASCAL_aug/PASCAL/converted/'
-DATA_LIST_PATH = '/home/yuanjial/DataSet/PASCAL_aug/PASCAL/converted/train.txt'
+BATCH_SIZE = 10
+DATA_DIRECTORY = '/home/yuanjial/DataSet/PASCAL/VOCdevkit/VOC2012'
+DATA_LIST_PATH = '/home/yuanjial/DataSet/PASCAL/VOCdevkit/VOC2012/train.txt'
 INPUT_SIZE = '321,321'
 LEARNING_RATE = 2.5e-6
 MOMENTUM = 0# 0.9
 NUM_STEPS = 30001
 POWER = 0.9
-RESTORE_FROM = '../../deeplab_direction/logs/deeplab_resnet.ckpt'
+RESTORE_FROM = '../../tensorflow-deeplab-resnet/logs/deeplab_resnet.ckpt'
 SAVE_NUM_IMAGES = 2
 SAVE_PRED_EVERY = 50
 SNAPSHOT_DIR = 'snapshots'
@@ -115,14 +115,23 @@ def load(saver, sess, ckpt_path):
 def main():
     """Create the model and start the training."""
     args = get_arguments()
-    coord = tf.train.Coordinator()
 
     # Load reader.
 
     h, w = map(int, args.input_size.split(','))
-
-    image_batch  = tf.placeholder(tf.float32, shape=[args.batch_size, h, w, 5], name='input')
-    label_batch  = tf.placeholder(tf.uint8, shape=[args.batch_size, h, w, 1], name='label')
+    '''
+    input_size = (h, w)
+    with tf.name_scope("create_inputs"):
+        reader = ImageReader(
+            args.data_dir,
+            args.data_list,
+            input_size,
+            args.random_scale,
+            coord)
+        image_batch, label_batch = reader.dequeue(args.batch_size)
+    '''
+    image_batch = tf.placeholder(tf.float32, shape=[args.batch_size, h, w, 3], name='input_images')
+    label_batch = tf.placeholder(tf.uint8, shape=[args.batch_size, h, w, 1], name='label_images')
 
     # Create network.
     net = DeepLabResNetModel({'data': image_batch}, is_training=args.is_training)
@@ -139,23 +148,24 @@ def main():
     # thus all_variables() should be restored.
     restore_var = tf.global_variables()
     all_trainable = [v for v in tf.trainable_variables() if 'beta' not in v.name and 'gamma' not in v.name]
-    fc_trainable = [v for v in all_trainable if 'fc' in v.name] # lr * 10.0
-    conv1_trainable = [v for v in all_trainable if 'conv1' in v.name] # lr * 20.0
-    conv_trainable = [v for v in all_trainable if 'fc' not in v.name and 'conv1' not in v.name] # lr * 1.0
-    assert(len(all_trainable) == len(fc_trainable) + len(conv1_trainable) + len(conv_trainable))
+    fc_trainable = [v for v in all_trainable if 'fc' in v.name]
+    conv_trainable = [v for v in all_trainable if 'fc' not in v.name] # lr * 1.0
+    fc_w_trainable = [v for v in fc_trainable if 'weights' in v.name] # lr * 10.0
+    fc_b_trainable = [v for v in fc_trainable if 'biases' in v.name] # lr * 20.0
+    assert(len(all_trainable) == len(fc_trainable) + len(conv_trainable))
+    assert(len(fc_trainable) == len(fc_w_trainable) + len(fc_b_trainable))
 
     # Predictions: ignoring all predictions with labels greater or equal than n_classes
     raw_prediction = tf.reshape(raw_output, [-1, n_classes])
     label_proc = prepare_label(label_batch, tf.stack(raw_output.get_shape()[1:3]), one_hot=False) # [batch_size, h, w]
     raw_gt = tf.reshape(label_proc, [-1,])
-    raw_prediction = tf.reshape(raw_prediction, [-1,])
-    gt = tf.cast(raw_gt, tf.float32)
-    prediction = tf.cast(raw_prediction, tf.float32)
+    indices = tf.squeeze(tf.where(tf.less_equal(raw_gt, n_classes - 1)), 1)
+    gt = tf.cast(tf.gather(raw_gt, indices), tf.int32)
+    prediction = tf.gather(raw_prediction, indices)
 
 
     # Pixel-wise softmax loss.
-    # loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=prediction, labels=gt)
-    loss = tf.nn.weighted_cross_entropy_with_logits(targets=gt, logits=prediction, pos_weight=10, name='weighted_sigmoid')
+    loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=prediction, labels=gt)
     l2_losses = [args.weight_decay * tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'weights' in v.name]
     reduced_loss = tf.reduce_mean(loss) + tf.add_n(l2_losses)
 
@@ -178,22 +188,40 @@ def main():
     # Define loss and optimisation parameters.
     base_lr = tf.constant(args.learning_rate)
     step_ph = tf.placeholder(dtype=tf.float32, shape=())
-    learning_rate = tf.scalar_mul(base_lr, tf.pow(args.power,  step_ph // args.num_steps))
+    learning_rate = tf.scalar_mul(base_lr, tf.pow((1 - step_ph / args.num_steps), args.power))
 
-    opt_conv  = tf.train.MomentumOptimizer(learning_rate*1, args.momentum)
-    opt_fc    = tf.train.MomentumOptimizer(learning_rate*10.0, args.momentum)
-    opt_conv1 = tf.train.MomentumOptimizer(learning_rate*20.0, args.momentum)
+    #opt_conv = tf.train.MomentumOptimizer(learning_rate*0, args.momentum)
+    #opt_fc_w = tf.train.MomentumOptimizer(learning_rate, args.momentum)
+    #opt_fc_b = tf.train.MomentumOptimizer(learning_rate, args.momentum)
 
-    grads = tf.gradients(reduced_loss, conv_trainable + fc_trainable  + conv1_trainable)
-    grads_conv  = grads[:len(conv_trainable)]
-    grads_fc    = grads[len(conv_trainable) : (len(conv_trainable) + len(fc_trainable))]
-    grads_conv1 = grads[(len(conv_trainable) + len(fc_trainable)):]
+    opt_conv = tf.train.AdamOptimizer(learning_rate=learning_rate)
+    #opt_fc_w = tf.train.AdamOptimizer(learning_rate=learning_rate*5)
+    #opt_fc_b = tf.train.AdamOptimizer(learning_rate=learning_rate*5)
 
-    train_op_conv  = opt_conv.apply_gradients(zip(grads_conv, conv_trainable))
-    train_op_fc    = opt_fc.apply_gradients(zip(grads_fc, fc_trainable))
-    train_op_conv1 = opt_conv1.apply_gradients(zip(grads_conv1, conv1_trainable))
+    '''
+    grads = tf.gradients(reduced_loss, conv_trainable + fc_w_trainable + fc_b_trainable)
+    grads_conv = grads[:len(conv_trainable)]
+    grads_fc_w = grads[len(conv_trainable) : (len(conv_trainable) + len(fc_w_trainable))]
+    grads_fc_b = grads[(len(conv_trainable) + len(fc_w_trainable)):]
 
-    train_op = tf.group(train_op_conv, train_op_fc, train_op_conv1)
+    train_op_conv = opt_conv.apply_gradients(zip(grads_conv, conv_trainable))
+    train_op_fc_w = opt_fc_w.apply_gradients(zip(grads_fc_w, fc_w_trainable))
+    train_op_fc_b = opt_fc_b.apply_gradients(zip(grads_fc_b, fc_b_trainable))
+    '''
+    grads_conv = tf.gradients(reduced_loss, conv_trainable)
+    #grads_fc_w = opt_fc_w.compute_gradients(reduced_loss, var_list=fc_w_trainable)
+    #grads_fc_b = opt_fc_b.compute_gradients(reduced_loss, var_list=fc_b_trainable)
+
+
+    train_op_conv = opt_conv.apply_gradients(zip(grads_conv, conv_trainable))
+    #train_op_fc_w = opt_fc_w.apply_gradients(grads_fc_w)
+    #train_op_fc_b = opt_fc_b.apply_gradients(grads_fc_b)
+
+
+
+    train_op = tf.group(train_op_conv) # , train_op_fc_w, train_op_fc_b)
+
+    # train_op = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(reduced_loss)
 
     # Set up tf session and initialize variables.
     config = tf.ConfigProto(allow_soft_placement=True)
@@ -205,15 +233,18 @@ def main():
 
     # Saver for storing checkpoints of the model.
     saver = tf.train.Saver(var_list=restore_var, max_to_keep=5)#keep_checkpoint_every_n_hours=1.0)
-
-    # Load variables if the checkpoint is provided.
     load_var_list = [v for v in restore_var if ('conv1' not in v.name) and ('fc1_voc12' not in v.name)]
+    #load_name = [v.name for v in load_var_list]
+    #print("---load var name: {}".format(load_name))
+    # Load variables if the checkpoint is provided.
+    # restore_var_minus = [v for v in restore_var if 'cov1' not in v.name]
     if args.restore_from is not None:
         loader = tf.train.Saver(var_list=load_var_list)
         load(loader, sess, args.restore_from)
 
+
     ## Start queue threads.
-    pdb.set_trace()
+    coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(coord=coord, sess=sess)
 
     reader_option = {"resize":True, "resize_size":[h,w]}
@@ -223,11 +254,13 @@ def main():
         start_time = time.time()
         images, labels = train_dataset_reader.next_batch(args.batch_size)
         feed_dict = {image_batch:images, label_batch:labels, step_ph:step}
-        #feed_dict = {step_ph:step}
+        pdb.set_trace()
         if step % args.save_pred_every == 0:
+            # pdb.set_trace()
             loss_value, preds, summary = sess.run([reduced_loss,  pred, total_summary], feed_dict=feed_dict)
             summary_writer.add_summary(summary, step)
             save(saver, sess, args.snapshot_dir, step)
+
         loss_value, _ = sess.run([reduced_loss, train_op], feed_dict=feed_dict)
         duration = time.time() - start_time
         print('step {:d} \t loss = {:.3f}, ({:.3f} sec/step)'.format(step, loss_value, duration))
