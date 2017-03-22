@@ -52,7 +52,7 @@ __C.N_NEG = 20
 __C.N_PAIRS = 10
 
 # Energy scale in distrance transform
-__C.ENERGY_SCALE = 1
+__C.ENERGY_SCALE = 4
 
 # Training phase configures
 __C.TRAIN = edict()

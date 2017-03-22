@@ -30,15 +30,17 @@ from deeplab_resnet import DeepLabResNetModel,image_reader, decode_labels, inv_p
 
 n_classes = 1
 
-BATCH_SIZE = 8
+BATCH_SIZE = 10
 DATA_DIRECTORY = ''#'/home/yuanjial/DataSet/PASCAL_aug/PASCAL/converted/'
-DATA_LIST_PATH = '/home/yuanjial/DataSet/PASCAL_aug/PASCAL/converted/train.txt'
+#DATA_LIST_PATH = '/home/yuanjial/DataSet/PASCAL_aug/PASCAL/converted_pos/train.txt'
+DATA_LIST_PATH  = '/media/HDD/LargeDisk/zhouzh/deep-interactive-data/converted/train.txt'
 INPUT_SIZE = '321,321'
 LEARNING_RATE = 2.5e-6
 MOMENTUM = 0# 0.9
-NUM_STEPS = 30001
+NUM_STEPS = 60001
 POWER = 0.9
 RESTORE_FROM = '../../deeplab_direction/logs/deeplab_resnet.ckpt'
+#RESTORE_FROM = './logs/pos_neg/model.ckpt-60000'
 SAVE_NUM_IMAGES = 2
 SAVE_PRED_EVERY = 50
 SNAPSHOT_DIR = 'snapshots'
@@ -181,8 +183,8 @@ def main():
     learning_rate = tf.scalar_mul(base_lr, tf.pow(args.power,  step_ph // args.num_steps))
 
     opt_conv  = tf.train.MomentumOptimizer(learning_rate*1, args.momentum)
-    opt_fc    = tf.train.MomentumOptimizer(learning_rate*10.0, args.momentum)
-    opt_conv1 = tf.train.MomentumOptimizer(learning_rate*20.0, args.momentum)
+    opt_fc    = tf.train.MomentumOptimizer(learning_rate*5.0, args.momentum)
+    opt_conv1 = tf.train.MomentumOptimizer(learning_rate*5.0, args.momentum)
 
     grads = tf.gradients(reduced_loss, conv_trainable + fc_trainable  + conv1_trainable)
     grads_conv  = grads[:len(conv_trainable)]

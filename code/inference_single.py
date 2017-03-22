@@ -20,7 +20,8 @@ import numpy as np
 from deeplab_resnet import DeepLabResNetModel #, decode_labels, prepare_label
 
 SAVE_DIR = './output/'
-IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434, 156.042324, 156.523433), dtype=np.float32)
+#IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434, 156.042324, 156.523433), dtype=np.float32)
+IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434, 156.042324), dtype=np.float32)
 
 def get_arguments():
     """Parse all the arguments provided from the CLI.
@@ -63,7 +64,7 @@ def main():
 
     # Create network.
     with tf.device('/gpu:1'):
-        input_img = tf.placeholder(tf.float32, shape=[1, h, w, ch], name='input_img')
+        input_img = tf.placeholder(tf.float32, shape=[None, h, w, ch], name='input_img')
         net = DeepLabResNetModel({'data': tf.expand_dims(img, dim=0)}, is_training=False)
 
         # Which variables to load.
@@ -100,7 +101,7 @@ def main():
 
     print("max_k = ", max_k, " max_diff= ", max_diff)
     '''
-    pdb.set_trace()
+    # pdb.set_trace()
 
 
     # Perform inference.
