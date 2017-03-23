@@ -18,6 +18,9 @@ import tensorflow as tf
 import numpy as np
 
 from deeplab_resnet import DeepLabResNetModel #, decode_labels, prepare_label
+import denseCRF_infer3 as dcrf3
+import instance_falseColor as instanceRGB
+
 
 DATA_DIRECTORY = '/home/yuanjial/DataSet/PASCAL_aug/'
 DATA_LIST_NAME = './dataImg/val_smpl.txt'
@@ -78,7 +81,7 @@ def loadImages(rgbPath, samplePath):
     img = cv2.imread(rgbPath)
     smplData = scipy.io.loadmat(samplePath)['objsInfo']
 
-    images = []
+    classIds, images = [], []
     for ele in smplData:
         objData = ele[0][0][0]
         posMap = objData[0][..., np.newaxis]
@@ -87,8 +90,9 @@ def loadImages(rgbPath, samplePath):
         packData = np.concatenate((img, posMap, negMap), axis=2)
         packData = packData - IMG_MEAN
         images.append(packData)
+        classIds.append(objData[2][0,0])
 
-    return np.array(images), len(smplData)
+    return np.array(images), classIds, len(smplData)
 
 def main():
     """Create the model and start the evaluation process."""
@@ -121,18 +125,19 @@ def main():
     loader = tf.train.Saver(var_list=restore_var)
     load(loader, sess, args.model_weights)
 
-    pdb.set_trace()
     if not os.path.exists(args.save_dir):
         os.makedirs(args.save_dir)
 
     for rgbPath, smplPath in zip(imgList, smplList):
+        #rgbPath = '/home/yuanjial/DataSet/PASCAL_aug/JPEGImages/2007_001526.jpg'
+        #smplPath = '/home/yuanjial/DataSet/PASCAL_aug/pos_neg_Map/2007_001526_pnMap.mat'
         save_fname = rgbPath.split('/')[-1]
         save_fname = save_fname.split('.')[0]
 
         # Perform inference.
         #rgbPath = '/home/yuanjial/DataSet/PASCAL_aug/JPEGImages/2007_001377.jpg'
         #smplPath = '/home/yuanjial/DataSet/PASCAL_aug/pos_neg_Map/2007_001377_pnMap.mat'
-        inData, dataNum = loadImages(rgbPath, smplPath)
+        inData, classList,  dataNum = loadImages(rgbPath, smplPath)
         if(inData.shape[-1] != 5):
             continue;
 
@@ -147,6 +152,13 @@ def main():
             image.imsave(args.save_dir+ save_fname+'_'+str(k)+'.png', img, cmap = cm.gray, vmin=0, vmax=255 )
             image.imsave(args.save_dir+ save_fname+'_color_'+str(k)+'.png', img) #, cmap = cm.gray, vmin=0, vmax=255 )
 
+        fineInstance, coarseInstance = dcrf3.denseCRF_refine(save_fname, preds.shape[0])
+        fineRGB = instanceRGB.enc_falseColorInstanceImage(fineInstance, classList)
+        coarseRGB = instanceRGB.enc_falseColorInstanceImage(coarseInstance, classList)
+        #pdb.set_trace()
+        scipy.io.savemat(args.save_dir+save_fname+'.mat', {'label': fineInstance, 'classList':classList})
+        image.imsave(args.save_dir + save_fname+ '_fine.png', fineRGB)
+        image.imsave(args.save_dir + save_fname+ '_coarse.png', coarseRGB)
         print('The output file {} has been saved to {}'.format(save_fname, args.save_dir))
 
 

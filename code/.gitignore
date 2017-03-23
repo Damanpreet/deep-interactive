@@ -4,3 +4,4 @@ snapshots/
 output/
 dataImg/
 logs/
+*.png
