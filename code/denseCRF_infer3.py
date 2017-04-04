@@ -34,7 +34,7 @@ def denseCRF_refine(imgName, annNum):
 
     # dence crf inference
     annImg = annImg/max(np.max(annImg), 1e-10)
-    bgImg  = (1 - np.max(annImg, axis=0))*0.1
+    bgImg  = (1 - np.max(annImg, axis=0))*0.05
     U      = np.concatenate((bgImg[np.newaxis, ...], annImg), axis=0)
     U      = -np.log(U+1e-10)
     U      = U.reshape([U.shape[0], U.shape[1]*U.shape[2]])
