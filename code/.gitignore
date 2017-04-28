@@ -5,3 +5,4 @@ output/
 dataImg/
 logs/
 *.png
+output_*

@@ -11,7 +11,7 @@ import os
 # import sys
 # import time
 import pdb
-# import cv2
+import cv2
 from matplotlib import image #, cm
 from tifffile import imread as tiff_imread
 import tensorflow as tf
@@ -19,9 +19,8 @@ import numpy as np
 
 from deeplab_resnet import DeepLabResNetModel #, decode_labels, prepare_label
 
-SAVE_DIR = './output/'
-#IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434, 156.042324, 156.523433), dtype=np.float32)
-IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434, 156.042324), dtype=np.float32)
+SAVE_DIR = './output_test/'
+IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434, 156.042324, 156.523433), dtype=np.float32)
 
 def get_arguments():
     """Parse all the arguments provided from the CLI.
@@ -32,6 +31,8 @@ def get_arguments():
     parser = argparse.ArgumentParser(description="DeepLabLFOV Network Inference.")
     parser.add_argument("img_path", type=str,
                         help="Path to the RGB image file.")
+    parser.add_argument("pnmap_path", type=str,
+                        help="Path to the PN map file.")
     parser.add_argument("model_weights", type=str,
                         help="Path to the file with model weights.")
     parser.add_argument("--save-dir", type=str, default=SAVE_DIR,
@@ -54,9 +55,10 @@ def main():
     args = get_arguments()
 
     # Prepare image.
-    img = tiff_imread(args.img_path)
-    img = np.transpose(img, [1,2,0])
-    # img = cv2.imread(args.img_path) #tf.image.decode_jpeg(tf.read_file(args.img_path), channels=3)
+    rgbimg = cv2.imread(args.img_path)
+    pnmaps = tiff_imread(args.pnmap_path)
+    pnmaps = np.transpose(pnmaps, [1,2,0])
+    img = np.concatenate((rgbimg, pnmaps), axis=2)
     h, w, ch = img.shape
 
     # Extract mean.
@@ -87,23 +89,7 @@ def main():
     loader = tf.train.Saver(var_list=restore_var)
     load(loader, sess, args.model_weights)
 
-    '''
-    param_0 = sess.run(restore_var)
-    loader.restore(sess, './snapshots/model.ckpt-0')
-    param_1 = sess.run(restore_var)
-    max_diff = 0
-    max_k    = 0
-    for k in range(len(param_0)):
-        diff = np.max(param_0[k]-param_1[k])
-        if diff > max_diff:
-            max_diff = diff
-            max_k = k
-
-    print("max_k = ", max_k, " max_diff= ", max_diff)
-    '''
     # pdb.set_trace()
-
-
     # Perform inference.
     preds = sess.run(raw_output_up, feed_dict={input_img:img[np.newaxis, ...]})
     preds = preds.squeeze()

@@ -3,8 +3,7 @@ from tifffile import imread as tiff_imread
 import cv2
 import scipy.misc as misc
 import pdb
-'''
-Class BatchDataset used to read data batch by batch. the output is a ndarray with
+''' Class BatchDataset used to read data batch by batch. the output is a ndarray with
 (batch_size, ht, wd, ch)
 
 -- data_dir: path to the directory with images and labels
@@ -18,12 +17,14 @@ Class BatchDataset used to read data batch by batch. the output is a ndarray wit
 -- batch_perm: used for SGD, flush input order.
 -- batch_offset: indicate where the batch goes.
 '''
+IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434, 100.0, 100.0), dtype=np.float32)
 class BatchDataset:
     data_dir = []
     data_txt = []
     image_options = {}
 
     image_list = []
+    pnmap_list = []
     label_list = []
     image_num  = 0
 
@@ -45,15 +46,21 @@ class BatchDataset:
         f = open(self.data_txt,'r')
         for line in f:
             try:
-                image, label = line.strip("\n").split(' ')
+                image, pnmap, label = line.strip("\n").split(' ')
             except ValueError:
-                image = label = line.strip("\n")
+                image = pnmap = label = line.strip("\n")
             self.image_list.append(self.data_dir + image)
+            self.pnmap_list.append(self.data_dir + pnmap)
             self.label_list.append(self.data_dir + label)
 
     def read_batch_images_from_disk(self, file_list, flipH=False):
-        images = np.array([self.transform(self.image_list[k], flipH, 'tiff') for k in file_list])
+
+        images = np.array([self.transform(self.image_list[k], flipH, 'rgb') for k in file_list])
+        pnmaps = np.array([self.transform(self.pnmap_list[k], flipH, 'tiff') for k in file_list])
         labels = np.array([self.transform(self.label_list[k], flipH, 'grey') for k in file_list])
+
+        images = np.concatenate((images, pnmaps), axis=3)
+        images = np.float32(images) - IMG_MEAN
         labels = labels[..., np.newaxis]
         labels[labels>0] = 1
         return images, labels

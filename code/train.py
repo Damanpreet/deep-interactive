@@ -32,18 +32,18 @@ n_classes = 1
 
 BATCH_SIZE = 10
 DATA_DIRECTORY = ''#'/home/yuanjial/DataSet/PASCAL_aug/PASCAL/converted/'
-#DATA_LIST_PATH = '/home/yuanjial/DataSet/PASCAL_aug/PASCAL/converted_pos/train.txt'
-DATA_LIST_PATH  = '/media/HDD/LargeDisk/zhouzh/deep-interactive-data/converted/train.txt'
+DATA_LIST_PATH = '/home/yuanjial/DataSet/PASCAL_aug/PASCAL/converted/train.txt'
+#DATA_LIST_PATH  = '/media/HDD/LargeDisk/zhouzh/deep-interactive-data/converted/train.txt'
 INPUT_SIZE = '321,321'
-LEARNING_RATE = 2.5e-6
+LEARNING_RATE = 2.5e-5
 MOMENTUM = 0# 0.9
-NUM_STEPS = 60001
+NUM_STEPS = 80001
 POWER = 0.9
-RESTORE_FROM = '../../deeplab_direction/logs/deeplab_resnet.ckpt'
-#RESTORE_FROM = './logs/pos_neg/model.ckpt-60000'
+#RESTORE_FROM = './logs/deeplab_resnet.ckpt'
+RESTORE_FROM = './snapshots/model.ckpt-37100'
 SAVE_NUM_IMAGES = 2
-SAVE_PRED_EVERY = 50
-SNAPSHOT_DIR = 'snapshots'
+SAVE_PRED_EVERY = 500
+SNAPSHOT_DIR = 'snapshots/'
 WEIGHT_DECAY = 0.0005
 
 
@@ -209,9 +209,9 @@ def main():
     saver = tf.train.Saver(var_list=restore_var, max_to_keep=5)#keep_checkpoint_every_n_hours=1.0)
 
     # Load variables if the checkpoint is provided.
-    load_var_list = [v for v in restore_var if ('conv1' not in v.name) and ('fc1_voc12' not in v.name)]
+    # load_var_list = [v for v in restore_var if ('conv1' not in v.name) and ('fc1_voc12' not in v.name)]
     if args.restore_from is not None:
-        loader = tf.train.Saver(var_list=load_var_list)
+        loader = tf.train.Saver(var_list=restore_var)
         load(loader, sess, args.restore_from)
 
     ## Start queue threads.

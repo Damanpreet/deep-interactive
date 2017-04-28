@@ -29,8 +29,9 @@ __C.IMG_EXT = '.jpg'
 # Testing image extension
 __C.GT_EXT = '.png'
 
-# Data Root
-__C.DATA_DIR = '/home/yuanjial/DataSet/PASCAL_aug'
+# DataSet Attribute
+__C.DATA_DIR  = '/home/yuanjial/DataSet/PASCAL_aug'
+__C.DATA_NAME = 'PASCAL'
 
 # Trianing image data directory name
 __C.IMG_DIR = osp.join(__C.DATA_DIR, 'JPEGImages')
@@ -43,13 +44,13 @@ __C.BENCHMARK_DIR = 'PASCAL'
 __C.GT_DIR = osp.join(__C.DATA_DIR, 'SegmentationObjectFilledDenseCRF')
 
 # Number of positive sampels
-__C.N_POS = 5
+__C.N_POS = 4
 
 # Number of negative samples
 __C.N_NEG = 20
 
 # Number of pairs
-__C.N_PAIRS = 10
+__C.N_PAIRS = 6
 
 # Energy scale in distrance transform
 __C.ENERGY_SCALE = 4

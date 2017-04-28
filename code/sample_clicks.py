@@ -4,6 +4,7 @@ from cfg.config import cfg
 import cv2
 # import matplotlib.pyplot as plt
 import numpy as np
+import scipy.ndimage.morphology as smorpho
 import pdb
 import random as ran
 import argparse
@@ -27,7 +28,7 @@ def load_image_path(img_dir, img_ext):
             # truncate /n character
             file_names.append(line[:-1])
             file_name = line[:-1] + img_ext
-            images.append(osp.join(cfg.DATA_DIR, 'PASCAL', img_dir, file_name))
+            images.append(osp.join(cfg.DATA_DIR, cfg.DATA_NAME, img_dir, file_name))
 
     return images, file_names
 
@@ -40,7 +41,7 @@ def sample_cands(candidates, is_fixed, num, criteria, *args):
     res = []
 
     if not is_fixed:
-        num = ran.choice(range(num))
+        num = max(ran.choice(range(num)), 3)
 
     # to prevent deadlock when there are no enough points to satisfy the criteria
     cnt = 0
@@ -62,39 +63,34 @@ def dis_criteria(points, point, least_dist):
     if len(points) == 0:
         return True
 
-    for p in points:
-        dis = euclidean_dis(point, p)
+    diff = points - point
+    dist = np.sqrt(np.sum(diff*diff, 1))
 
-        # exit if the distance constraint is not satisfied
-        if dis < least_dist:
-            return False
+    if(min(dist) < least_dist):
+        return False
+
     return True
-
 
 
 def _compute_step(ys, xs):
 
-        min_x, min_y, max_x, max_y = np.min(xs), np.min(ys), np.max(xs), np.max(ys)
+    min_x, min_y, max_x, max_y = np.min(xs), np.min(ys), np.max(xs), np.max(ys)
+    h        = max_y - min_y
+    w        = max_x - min_x
+    min_dist = min(h, w)
 
-        h = max_y - min_y
-        w = max_x - min_x
+    d_step = (min_dist - cfg.D_MARGIN) // cfg.RATIO_FACTOR
 
-        min_dist = min(h, w)
-
-        d_step = (min_dist - cfg.D_MARGIN) // cfg.RATIO_FACTOR
-
-        return d_step
+    return d_step
 
 
-def _erosion(valid_area):
+def _erosion(valid_area, erode_dim=(2*cfg.D_MARGIN+1, 2*cfg.D_MARGIN+1)):
     # Fixed 3 by 3 erosion
-    erode_dim = (2 * cfg.D_MARGIN + 1, 2 * cfg.D_MARGIN + 1)
     erode_kernel = np.ones(erode_dim)
     erode = cv2.erode(valid_area, erode_kernel, iterations=1)
     return erode
 
-def _dilation_and_remove(valid_area):
-    dilation_dim = (2 * cfg.D + 1, 2 * cfg.D + 1)
+def _dilation_and_remove(valid_area, dilation_dim=(2*cfg.D+1, 2*cfg.D+1)):
     dilation_kernel = np.ones(dilation_dim)
     dilation = cv2.dilate(valid_area, dilation_kernel, iterations=1)
     dilation -= valid_area
@@ -102,14 +98,10 @@ def _dilation_and_remove(valid_area):
 
 def _dilation_and_remove_and_erosion(valid_area):
     dilation_dim = (2 * cfg.D + 1, 2 * cfg.D + 1)
-    dilation_kernel = np.ones(dilation_dim)
-    dilation = cv2.dilate(valid_area, dilation_kernel, iterations=1)
-    dilation -= valid_area
+    dilation     = _dilation_and_remove(valid_area, dilation_dim)
 
     erode_dim = (2 * cfg.NEG3_MARGIN + 1, 2 * cfg.NEG3_MARGIN + 1)
-    erode_kernel = np.ones(erode_dim)
-    erode = cv2.erode(dilation, erode_kernel, iterations=1)
-
+    erode     = _erosion(dilation, erode_dim)
 
     return erode
 
@@ -162,9 +154,6 @@ def _filter_samples(path, is_fixed, morphology, num=cfg.N_POS):
 
         # Sample points from candidates
         samples = sample_cands(candidates, is_fixed, num, dis_criteria, d_step)
-        while len(samples) == 0 and num == cfg.N_POS:
-            samples = sample_cands(candidates, is_fixed, num, dis_criteria, d_step)
-
         locs[obj].extend(samples)
 
         #for s in samples:
@@ -222,11 +211,8 @@ def neg_strategy2(path, num_negs=cfg.N_NEG):
         locs[obj] = []
 
     for obj, mapping in obj_mappings.items():
-
-
         for other_obj, other_mapping in obj_mappings.items():
             if obj != other_obj:
-
                 morph = _erosion(other_mapping)
 
                 if np.sum(morph) == 0:
@@ -263,7 +249,7 @@ def neg_strategy3(path, num_negs=cfg.N_NEG):
     return _filter_samples(path, True, _dilation_and_remove_and_erosion, num_negs)
 
 
-def cat_channels(image, gt):
+def cat_channels(gt):
     '''Constructing positive mapping channel and negative mapping channels.
     input:
     output:
@@ -272,32 +258,25 @@ def cat_channels(image, gt):
     res = {}
     res['data'] = []
     res['labels'] = []
-    if not gt or not image:
+    if not gt:
         return None
 
-    gt_arr = cv2.imread(gt, 0)
-
-    h, w = gt_arr.shape
-
-    img_arr = cv2.imread(image)
-
-    #print(img_arr.shape)
+    gt_arr  = cv2.imread(gt, 0)
+    h, w    = gt_arr.shape
 
     for n in range(cfg.N_PAIRS):
         pos_samples = pos_strategy(gt)
-
+        neg_samples = neg_strategy1(gt)
 
         # neg_samples = [neg_strategy1, neg_strategy2, neg_strategy3]
         # idx = n // (cfg.N_PAIRS)
         # neg_samples = neg_samples[idx](gt)
 
         pos_energies = construct_channels(pos_samples, h, w)
-        # neg_energies = construct_channels(neg_samples, h, w)
-
+        neg_energies = construct_channels(neg_samples, h, w)
 
         for obj in pos_samples:
-            # pairs = np.concatenate((img_arr, pos_energies[obj], neg_energies[obj]), axis=2)
-            pairs = np.concatenate((img_arr, pos_energies[obj]), axis=2)
+            pairs = np.concatenate((pos_energies[obj], neg_energies[obj]), axis=2)
             label = gt_arr * (gt_arr == obj)
             res['data'].append(pairs)
             res['labels'].append(label)
@@ -309,32 +288,16 @@ def construct_channels(samples, h, w):
 
     energies = {}
     for obj, lst in samples.items():
-        energy = np.zeros((h, w))
-        energy.fill(255)
+        mask_obj    = np.ones((h, w))
+        for pt in lst:
+            mask_obj[pt[0],pt[1]] = 0
 
-        for p in lst:
-            y_vec = np.arange(h)
+        energy = smorpho.distance_transform_edt(mask_obj)
+        energy = energy * cfg.ENERGY_SCALE
+        energy[energy>255] = 255
+        energy             = np.uint8(energy)
 
-            x_vec = np.arange(w)
-
-            y_vec = y_vec[:, np.newaxis]
-            x_vec = x_vec[:, np.newaxis]
-
-            y_vec -= p[0]
-            x_vec -= p[1]
-
-            intermedia = np.power(y_vec,2) + np.power(x_vec.T, 2)
-            intermedia = np.sqrt(intermedia)*cfg.ENERGY_SCALE
-
-            intermedia[intermedia > 255] = 255
-
-            energy = np.array((intermedia, energy), dtype=np.uint8)
-
-            energy = energy.min(axis=0)
-
-
-        energy = energy[:, :, np.newaxis]
-
+        energy        = energy[:, :, np.newaxis]
         energies[obj] = energy
 
     return energies
@@ -343,7 +306,7 @@ def argparser():
     ''' Parse all arguments provided from the command line tool(CLT)
     '''
     parser = argparse.ArgumentParser(description='Convert images to five channels mapping.')
-    parser.add_argument('--save-dir', type=str, default='converted_pos', help="Directory to store converted tiff files")
+    parser.add_argument('--save-dir', type=str, default='converted', help="Directory to store converted tiff files")
     return parser.parse_args()
 
 
@@ -359,26 +322,21 @@ def main():
     images, _ = load_image_path(cfg.IMG_DIR, cfg.IMG_EXT)
 
     output_path = osp.join(cfg.DATA_DIR, cfg.BENCHMARK_DIR, args.save_dir)
-
     create_dir(output_path)
 
     labels_dir = osp.join(output_path, 'labels')
-
     create_dir(labels_dir)
 
     data_dir = osp.join(output_path, 'data')
-
     create_dir(data_dir)
 
     train_txt = open(osp.join(output_path, 'train.txt'), 'w+')
     train_txt.truncate()
 
-
     for idx, (image, gt, fn) in enumerate(zip(images, gts, filenames)):
-        if idx > 3000:
+        if idx > 5000:
             break
-
-        pairs = cat_channels(image, gt)
+        pairs = cat_channels(gt)
 
 
         data = np.array(pairs['data'], dtype=np.uint8)
@@ -396,7 +354,7 @@ def main():
             file_path = osp.join(data_dir, new_name)
             label_path = osp.join(labels_dir, new_label_name)
 
-            train_txt.write(file_path + ' ' + label_path + '\n')
+            train_txt.write(image + ' ' + file_path + ' ' + label_path + '\n')
 
             imsave(file_path, sample, compress=6)
             imsave(label_path, label, compress=6)
