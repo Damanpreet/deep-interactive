@@ -17,6 +17,8 @@ import pdb
 -- batch_perm: used for SGD, flush input order.
 -- batch_offset: indicate where the batch goes.
 '''
+
+ONLY_POS = True
 IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434, 100.0, 100.0), dtype=np.float32)
 class BatchDataset:
     data_dir = []
@@ -59,8 +61,9 @@ class BatchDataset:
         pnmaps = np.array([self.transform(self.pnmap_list[k], flipH, 'tiff') for k in file_list])
         labels = np.array([self.transform(self.label_list[k], flipH, 'grey') for k in file_list])
 
-        images = np.concatenate((images, pnmaps), axis=3)
-        images = np.float32(images) - IMG_MEAN
+        pnmaps = pnmaps[..., 0] if ONLY_POS else pnmaps
+        images = np.concatenate((images, pnmaps[..., np.newaxis]), axis=3) if ONLY_POS else np.concatenate(images, pnmaps, axis=3)
+        images = np.float32(images) - IMG_MEAN[:4] if ONLY_POS else np.float32(images) - IMG_MEAN
         labels = labels[..., np.newaxis]
         labels[labels>0] = 1
         return images, labels

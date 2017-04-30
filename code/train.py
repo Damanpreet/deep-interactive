@@ -28,19 +28,21 @@ import tensorflow as tf
 
 from deeplab_resnet import DeepLabResNetModel,image_reader, decode_labels, inv_preprocess, prepare_label
 
+ONLY_POS  = True
 n_classes = 1
 
 BATCH_SIZE = 10
-DATA_DIRECTORY = ''#'/home/yuanjial/DataSet/PASCAL_aug/PASCAL/converted/'
-DATA_LIST_PATH = '/home/yuanjial/DataSet/PASCAL_aug/PASCAL/converted/train.txt'
+DATA_DIRECTORY = ''
+#DATA_LIST_PATH = '/home/yuanjial/DataSet/PASCAL_aug/PASCAL/converted/train.txt'
+DATA_LIST_PATH = '/home/yuanjial/DataSet/COCO/coco2014_train/converted/train.txt'
 #DATA_LIST_PATH  = '/media/HDD/LargeDisk/zhouzh/deep-interactive-data/converted/train.txt'
 INPUT_SIZE = '321,321'
 LEARNING_RATE = 2.5e-5
 MOMENTUM = 0# 0.9
 NUM_STEPS = 80001
 POWER = 0.9
-#RESTORE_FROM = './logs/deeplab_resnet.ckpt'
-RESTORE_FROM = './snapshots/model.ckpt-37100'
+# RESTORE_FROM = './logs/deeplab_resnet.ckpt'
+RESTORE_FROM = './snapshots/model.ckpt-500'
 SAVE_NUM_IMAGES = 2
 SAVE_PRED_EVERY = 500
 SNAPSHOT_DIR = 'snapshots/'
@@ -119,11 +121,13 @@ def main():
     args = get_arguments()
     coord = tf.train.Coordinator()
 
+    os.environ['CUDA_VISIBLE_DEVICES'] = '1'
     # Load reader.
 
     h, w = map(int, args.input_size.split(','))
+    c = 4 if ONLY_POS else 5
 
-    image_batch  = tf.placeholder(tf.float32, shape=[args.batch_size, h, w, 5], name='input')
+    image_batch  = tf.placeholder(tf.float32, shape=[args.batch_size, h, w, c], name='input')
     label_batch  = tf.placeholder(tf.uint8, shape=[args.batch_size, h, w, 1], name='label')
 
     # Create network.
@@ -161,6 +165,7 @@ def main():
     l2_losses = [args.weight_decay * tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'weights' in v.name]
     reduced_loss = tf.reduce_mean(loss) + tf.add_n(l2_losses)
 
+    '''
     # Processed predictions: for visualisation.
     raw_output_up = tf.image.resize_bilinear(raw_output, tf.shape(image_batch)[1:3,])
     raw_output_up = tf.argmax(raw_output_up, dimension=3)
@@ -176,6 +181,7 @@ def main():
                                      tf.concat([images_summary, labels_summary, preds_summary], axis=2),
                                      max_outputs=args.save_num_images) # Concatenate row-wise.
     summary_writer = tf.summary.FileWriter(args.snapshot_dir)
+    '''
 
     # Define loss and optimisation parameters.
     base_lr = tf.constant(args.learning_rate)
@@ -209,9 +215,9 @@ def main():
     saver = tf.train.Saver(var_list=restore_var, max_to_keep=5)#keep_checkpoint_every_n_hours=1.0)
 
     # Load variables if the checkpoint is provided.
-    # load_var_list = [v for v in restore_var if ('conv1' not in v.name) and ('fc1_voc12' not in v.name)]
+    load_var_list = [v for v in restore_var if ('conv1' not in v.name) and ('fc1_voc12' not in v.name)]
     if args.restore_from is not None:
-        loader = tf.train.Saver(var_list=restore_var)
+        loader = tf.train.Saver(var_list=load_var_list)
         load(loader, sess, args.restore_from)
 
     ## Start queue threads.
@@ -227,8 +233,9 @@ def main():
         feed_dict = {image_batch:images, label_batch:labels, step_ph:step}
         #feed_dict = {step_ph:step}
         if step % args.save_pred_every == 0:
-            loss_value, preds, summary = sess.run([reduced_loss,  pred, total_summary], feed_dict=feed_dict)
-            summary_writer.add_summary(summary, step)
+            # loss_value, preds, summary = sess.run([reduced_loss,  pred, total_summary], feed_dict=feed_dict)
+            # summary_writer.add_summary(summary, step)
+            loss_value = sess.run([reduced_loss], feed_dict=feed_dict)
             save(saver, sess, args.snapshot_dir, step)
         loss_value, _ = sess.run([reduced_loss, train_op], feed_dict=feed_dict)
         duration = time.time() - start_time

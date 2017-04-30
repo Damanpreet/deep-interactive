@@ -19,6 +19,7 @@ import numpy as np
 
 from deeplab_resnet import DeepLabResNetModel #, decode_labels, prepare_label
 
+ONLY_POS = True
 SAVE_DIR = './output_test/'
 IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434, 156.042324, 156.523433), dtype=np.float32)
 
@@ -57,12 +58,13 @@ def main():
     # Prepare image.
     rgbimg = cv2.imread(args.img_path)
     pnmaps = tiff_imread(args.pnmap_path)
-    pnmaps = np.transpose(pnmaps, [1,2,0])
+    pnmaps = pnmaps[0, ...] if ONLY_POS else np.transpose(pnmaps, [1,2,0])
+    pnmaps = pnmaps[..., np.newaxis] if ONLY_POS else pnmaps
     img = np.concatenate((rgbimg, pnmaps), axis=2)
     h, w, ch = img.shape
 
     # Extract mean.
-    img = np.float32(img) - IMG_MEAN
+    img = np.float32(img)-IMG_MEAN[0:4] if ONLY_POS else np.float32(img)-IMG_MEAN
 
     # Create network.
     with tf.device('/gpu:1'):

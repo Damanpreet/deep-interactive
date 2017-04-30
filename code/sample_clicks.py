@@ -22,13 +22,12 @@ def load_image_path(img_dir, img_ext):
         print('No image directory provided.')
         return images
 
-    txt_path = osp.join(cfg.DATA_DIR, 'train.txt')
-    with open(txt_path, 'r') as fp:
+    with open(cfg.TXT_PATH, 'r') as fp:
         for line in fp:
             # truncate /n character
             file_names.append(line[:-1])
             file_name = line[:-1] + img_ext
-            images.append(osp.join(cfg.DATA_DIR, cfg.DATA_NAME, img_dir, file_name))
+            images.append(osp.join(cfg.BASE_DIR, img_dir, file_name))
 
     return images, file_names
 
@@ -316,12 +315,12 @@ def create_dir(dir_name):
 
 def main():
 
-    args = argparser()
+    # args = argparser()
 
-    gts, filenames = load_image_path(cfg.GT_DIR, cfg.GT_EXT)
-    images, _ = load_image_path(cfg.IMG_DIR, cfg.IMG_EXT)
+    gts, filenames = load_image_path(osp.join(cfg.BASE_DIR, cfg.INSTANCEANN_DIR), cfg.GT_EXT)
+    images, _ = load_image_path(osp.join(cfg.BASE_DIR, cfg.IMG_DIR), cfg.IMG_EXT)
 
-    output_path = osp.join(cfg.DATA_DIR, cfg.BENCHMARK_DIR, args.save_dir)
+    output_path = osp.join(osp.join(cfg.BASE_DIR, cfg.OUT_PATH))
     create_dir(output_path)
 
     labels_dir = osp.join(output_path, 'labels')

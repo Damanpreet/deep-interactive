@@ -23,25 +23,20 @@ __C.D_MARGIN = 1
 # Ratio factor for determine the distance among pixels
 __C.RATIO_FACTOR = 6.
 
-# Training image extension
+
+# INPUT DataSet Attribute
+__C.TXT_PATH = '/home/yuanjial/NeuralNetwork/FilePreprocess/coco/train.txt'
+__C.BASE_DIR = '/home/yuanjial/DataSet/COCO/coco2014_train'
+
+__C.IMG_DIR = 'Images'
 __C.IMG_EXT = '.jpg'
 
-# Testing image extension
+__C.INSTANCEANN_DIR = 'InstanceAnn'
 __C.GT_EXT = '.png'
 
-# DataSet Attribute
-__C.DATA_DIR  = '/home/yuanjial/DataSet/PASCAL_aug'
-__C.DATA_NAME = 'PASCAL'
+# directory to store converted tiff files
+__C.OUT_PATH = 'converted'
 
-# Trianing image data directory name
-__C.IMG_DIR = osp.join(__C.DATA_DIR, 'JPEGImages')
-
-# Benchmark Directory
-__C.BENCHMARK_DIR = 'PASCAL'
-
-
-# Testing image data directory name
-__C.GT_DIR = osp.join(__C.DATA_DIR, 'SegmentationObjectFilledDenseCRF')
 
 # Number of positive sampels
 __C.N_POS = 4
@@ -64,14 +59,6 @@ __C.TEST = edict()
 
 # Project Root
 __C.ROOT_DIR = osp.abspath(osp.join(osp.dirname(__file__), '..', '..'))
-
-
-# Models Root
-__C.MODELS_DIR = osp.abspath(osp.join(__C.ROOT_DIR, 'models'))
-
-
-# Converted images directory
-__C.NEW_DIR = osp.abspath(osp.join(__C.DATA_DIR, 'converted_images'))
 
 
 # GPU ID
