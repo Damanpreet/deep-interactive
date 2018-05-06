@@ -1,16 +1,14 @@
 import os.path as osp
 import os
-import time
+from cfg.config import cfg
 import cv2
-import scipy.misc as smisc
 # import matplotlib.pyplot as plt
 import numpy as np
 import scipy.ndimage.morphology as smorpho
+import pdb
 import random as ran
 import argparse
 from tifffile import imsave
-
-from cfg.config import cfg
 
 def load_image_path(img_dir, img_ext):
     '''Load training image text file as list
@@ -42,7 +40,7 @@ def sample_cands(candidates, is_fixed, num, criteria, *args):
     res = []
 
     if not is_fixed:
-        num = max(ran.choice(range(num)), num/2)
+        num = max(ran.choice(range(num)), 3)
 
     # to prevent deadlock when there are no enough points to satisfy the criteria
     cnt = 0
@@ -121,7 +119,7 @@ def _filter_samples(path, is_fixed, morphology, num=cfg.N_POS):
     if not path:
         return locs
 
-    img_arr = smisc.imread(path, mode='P')
+    img_arr = cv2.imread(path, 0)
 
     obj_lst = np.unique(img_arr[img_arr != 0])
 
@@ -262,7 +260,7 @@ def cat_channels(gt):
     if not gt:
         return None
 
-    gt_arr  = smisc.imread(gt, mode='P')
+    gt_arr  = cv2.imread(gt, 0)
     h, w    = gt_arr.shape
 
     for n in range(cfg.N_PAIRS):
@@ -273,11 +271,8 @@ def cat_channels(gt):
         # idx = n // (cfg.N_PAIRS)
         # neg_samples = neg_samples[idx](gt)
 
-        start_time = time.time()
         pos_energies = construct_channels(pos_samples, h, w)
         neg_energies = construct_channels(neg_samples, h, w)
-        duration = time.time()-start_time;
-        print('construct pos/neg channel from points: {:.5f}sec / ({:d}, {:d})'.format(duration, h, w))
 
         for obj in pos_samples:
             pairs = np.concatenate((pos_energies[obj], neg_energies[obj]), axis=2)
@@ -322,18 +317,8 @@ def main():
 
     # args = argparser()
 
-    # gts, filenames = load_image_path(osp.join(cfg.BASE_DIR, cfg.INSTANCEANN_DIR), cfg.GT_EXT)
-    # images, _ = load_image_path(osp.join(cfg.BASE_DIR, cfg.IMG_DIR), cfg.IMG_EXT)
-    with open(cfg.TXT_PATH) as f:
-        image_list = f.read().splitlines()
-    gts, images, filenames = [], [], []
-    for idx, ele in enumerate(image_list):
-        im_path, gt_path = ele.split()
-        fname = format(idx, '05d')
-        gts.append(gt_path)
-        images.append(im_path)
-        filenames.append(fname)
-
+    gts, filenames = load_image_path(osp.join(cfg.BASE_DIR, cfg.INSTANCEANN_DIR), cfg.GT_EXT)
+    images, _ = load_image_path(osp.join(cfg.BASE_DIR, cfg.IMG_DIR), cfg.IMG_EXT)
 
     output_path = osp.join(osp.join(cfg.BASE_DIR, cfg.OUT_PATH))
     create_dir(output_path)
@@ -350,8 +335,6 @@ def main():
     for idx, (image, gt, fn) in enumerate(zip(images, gts, filenames)):
         if idx > 5000:
             break
-        import pdb
-        pdb.set_trace()
         pairs = cat_channels(gt)
 
 
@@ -364,16 +347,16 @@ def main():
 
             sample = sample.transpose((2, 0, 1))
 
-            new_name = fn + '-' + str(i) + '_train.tif'
-            new_label_name = fn + '-' + str(i) + '_train.tif'
+            new_name = fn + '-' + str(i) + '.tif'
+            new_label_name = fn + '-' + str(i) + '.tif'
 
             file_path = osp.join(data_dir, new_name)
             label_path = osp.join(labels_dir, new_label_name)
 
             train_txt.write(image + ' ' + file_path + ' ' + label_path + '\n')
 
-            #imsave(file_path, sample, compress=6)
-            #imsave(label_path, label, compress=6)
+            imsave(file_path, sample, compress=6)
+            imsave(label_path, label, compress=6)
 
         print('image {} done!, counter={}'.format(fn, idx))
 

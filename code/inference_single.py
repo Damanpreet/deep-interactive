@@ -9,7 +9,7 @@ import argparse
 # from datetime import datetime
 import os
 # import sys
-# import time
+import time
 import pdb
 import cv2
 from matplotlib import image #, cm
@@ -19,7 +19,7 @@ import numpy as np
 
 from deeplab_resnet import DeepLabResNetModel #, decode_labels, prepare_label
 
-ONLY_POS = True
+ONLY_POS = False
 SAVE_DIR = './output_test/'
 IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434, 156.042324, 156.523433), dtype=np.float32)
 
@@ -67,17 +67,16 @@ def main():
     img = np.float32(img)-IMG_MEAN[0:4] if ONLY_POS else np.float32(img)-IMG_MEAN
 
     # Create network.
-    with tf.device('/gpu:1'):
-        input_img = tf.placeholder(tf.float32, shape=[None, h, w, ch], name='input_img')
-        net = DeepLabResNetModel({'data': tf.expand_dims(img, dim=0)}, is_training=False)
+    input_img = tf.placeholder(tf.float32, shape=[None, h, w, ch], name='input_img')
+    net = DeepLabResNetModel({'data': tf.expand_dims(img, dim=0)}, is_training=False)
 
-        # Which variables to load.
-        restore_var = tf.global_variables()
+    # Which variables to load.
+    restore_var = tf.global_variables()
 
-        # Predictions.
-        raw_output = net.layers['fc1_voc12']
-        raw_output_up = tf.image.resize_bilinear(raw_output, tf.shape(img)[0:2,])
-        # pred = tf.expand_dims(raw_output_up, dim=3)
+    # Predictions.
+    raw_output = net.layers['fc1_voc12']
+    raw_output_up = tf.image.resize_bilinear(raw_output, tf.shape(img)[0:2,])
+    # pred = tf.expand_dims(raw_output_up, dim=3)
 
     # Set up TF session and initialize variables.
     config = tf.ConfigProto()
@@ -93,6 +92,7 @@ def main():
 
     # pdb.set_trace()
     # Perform inference.
+    start_time = time.time();
     preds = sess.run(raw_output_up, feed_dict={input_img:img[np.newaxis, ...]})
     preds = preds.squeeze()
 
@@ -102,8 +102,9 @@ def main():
         os.makedirs(args.save_dir)
     # cv2.imwrite(args.save_dir+'mask.png', preds)
     image.imsave(args.save_dir+'mask.png', preds) # ,cmap = cm.grey, vmin=0, vmax=255 )
+    duration = time.time()-start_time
 
-    print('The output file has been saved to {}'.format(args.save_dir + 'mask.png'))
+    print('The output file has been saved to {} -- time: {:.4f} sec'.format(args.save_dir + 'mask.png', duration))
 
 
 if __name__ == '__main__':

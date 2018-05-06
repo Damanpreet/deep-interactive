@@ -26,27 +26,25 @@ import pdb
 import tensorflow as tf
 # import numpy as np
 
-from deeplab_resnet import DeepLabResNetModel,image_reader, decode_labels, inv_preprocess, prepare_label
+from deeplab_resnet import DeepLabResNetModel,image_reader, prepare_label
 
-ONLY_POS  = True
+ONLY_POS  = False
 n_classes = 1
 
-BATCH_SIZE = 10
+BATCH_SIZE     = 10
 DATA_DIRECTORY = ''
-#DATA_LIST_PATH = '/home/yuanjial/DataSet/PASCAL_aug/PASCAL/converted/train.txt'
-DATA_LIST_PATH = '/home/yuanjial/DataSet/COCO/coco2014_train/converted/train.txt'
-#DATA_LIST_PATH  = '/media/HDD/LargeDisk/zhouzh/deep-interactive-data/converted/train.txt'
-INPUT_SIZE = '321,321'
-LEARNING_RATE = 2.5e-5
-MOMENTUM = 0# 0.9
-NUM_STEPS = 80001
-POWER = 0.9
-# RESTORE_FROM = './logs/deeplab_resnet.ckpt'
-RESTORE_FROM = './snapshots/model.ckpt-500'
+DATA_LIST_PATH  = '/media/zhouzh/LargeDisk/yjl_dataset/CVPPP/CVPPP/converted/train_converted_cvppp.txt'
+INPUT_SIZE    = '321,321'
+LEARNING_RATE = 1e-5
+MOMENTUM  = 0.9
+NUM_STEPS = 25001
+POWER     = 0.9
+RESTORE_FROM   = './snapshots/model.ckpt-25000'
+# RESTORE_FROM = './snapshots/model.ckpt-500'
 SAVE_NUM_IMAGES = 2
-SAVE_PRED_EVERY = 500
+SAVE_PRED_EVERY = 1000
 SNAPSHOT_DIR = 'snapshots/'
-WEIGHT_DECAY = 0.0005
+WEIGHT_DECAY = 0.0001
 
 
 def get_arguments():
@@ -121,7 +119,7 @@ def main():
     args = get_arguments()
     coord = tf.train.Coordinator()
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
     # Load reader.
 
     h, w = map(int, args.input_size.split(','))
@@ -161,9 +159,9 @@ def main():
 
     # Pixel-wise softmax loss.
     # loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=prediction, labels=gt)
-    loss = tf.nn.weighted_cross_entropy_with_logits(targets=gt, logits=prediction, pos_weight=10, name='weighted_sigmoid')
+    loss = tf.nn.weighted_cross_entropy_with_logits(targets=gt, logits=prediction, pos_weight=5, name='weighted_sigmoid')
     l2_losses = [args.weight_decay * tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'weights' in v.name]
-    reduced_loss = tf.reduce_mean(loss) + tf.add_n(l2_losses)
+    reduced_loss = tf.reduce_mean(loss)*20 + tf.add_n(l2_losses)
 
     '''
     # Processed predictions: for visualisation.
@@ -212,12 +210,12 @@ def main():
     sess.run(init)
 
     # Saver for storing checkpoints of the model.
-    saver = tf.train.Saver(var_list=restore_var, max_to_keep=5)#keep_checkpoint_every_n_hours=1.0)
+    saver = tf.train.Saver(var_list=restore_var, max_to_keep=2)#keep_checkpoint_every_n_hours=1.0)
 
     # Load variables if the checkpoint is provided.
-    load_var_list = [v for v in restore_var if ('conv1' not in v.name) and ('fc1_voc12' not in v.name)]
+    # load_var_list = [v for v in restore_var if ('conv1' not in v.name) and ('fc1_voc12' not in v.name)]
     if args.restore_from is not None:
-        loader = tf.train.Saver(var_list=load_var_list)
+        loader = tf.train.Saver(var_list=restore_var)
         load(loader, sess, args.restore_from)
 
     ## Start queue threads.
@@ -237,9 +235,9 @@ def main():
             # summary_writer.add_summary(summary, step)
             loss_value = sess.run([reduced_loss], feed_dict=feed_dict)
             save(saver, sess, args.snapshot_dir, step)
-        loss_value, _ = sess.run([reduced_loss, train_op], feed_dict=feed_dict)
+        loss_value, inf_loss, l2_loss, _ = sess.run([reduced_loss, loss, l2_losses, train_op], feed_dict=feed_dict)
         duration = time.time() - start_time
-        print('step {:d} \t loss = {:.3f}, ({:.3f} sec/step)'.format(step, loss_value, duration))
+        print('step {:d} \t loss = {:.3f},  ({:.3f} sec/step)'.format(step, loss_value, duration))
     coord.request_stop()
     coord.join(threads)
 

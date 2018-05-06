@@ -21,7 +21,7 @@ from deeplab_resnet import DeepLabResNetModel #, decode_labels, prepare_label
 import denseCRF_infer3 as dcrf3
 import instance_falseColor as instanceRGB
 
-
+ONLY_POS = False
 DATA_DIRECTORY = '/home/yuanjial/DataSet/PASCAL_aug/'
 DATA_LIST_NAME = './dataImg/val_smpl.txt'
 SAVE_DIR = './output/'
@@ -56,33 +56,38 @@ def load(saver, sess, ckpt_path):
 def read_image_list():
     '''
      output: rgbList: list of path to rgbimages
-             smplList: list of path to sample pos/neg map packages.
+             pnList: list of path to sample pos/neg map packages.
+             labelList: list of path to labels
     '''
     f = open(DATA_LIST_NAME, 'r')
-    imgList, smplList = [], []
+    imgList, pnList, labelList = [], [], []
     for line in f:
-        rgbImg, smpl = line.strip("\n").split(' ')
+        tmp = line.strip("\n").split('')
+        rgbImg, pnImg, labelImg = tmp[0], tmp[1], tmp[-1]
 
-        imgList.append(DATA_DIRECTORY+rgbImg)
-        smplList.append(DATA_DIRECTORY+smpl)
+        imgList.append(DATA_DIRECTORY + rgbImg)
+        pnList.append(DATA_DIRECTORY + pnImg)
+        labelList.append(DATA_DIRECTORY + labelImg)
 
-    return imgList, smplList
+    return imgList, pnList, labelList
 
 
-def loadImages(rgbPath, samplePath):
+def loadImages(rgbPath, pnPath, labelPath=''):
     ''' load and pack data as a batch
      Args:
-       rgbPath: path to the rgb image file.
-       samplePath: path to the positive/negtive energy map package.
+       rgbPath:  path to the rgb image file.
+       pnPath:   path to the positive/negtive energy map package.
+       labelPath:path to the Ground Truth label file.
 
      Returns:
         batch of input data for neural network,has shape(batch, ht, wd, 5)%[rgbImg, pos, neg].
+        batch of label data
     '''
     img = cv2.imread(rgbPath)
-    smplData = scipy.io.loadmat(samplePath)['objsInfo']
+    pnData = scipy.io.loadmat(pnPath)['objsInfo']
 
     classIds, images = [], []
-    for ele in smplData:
+    for ele in pnData:
         objData = ele[0][0][0]
         posMap = objData[0][..., np.newaxis]
         negMap = objData[1][..., np.newaxis]
@@ -92,7 +97,7 @@ def loadImages(rgbPath, samplePath):
         images.append(packData)
         classIds.append(objData[2][0,0])
 
-    return np.array(images), classIds, len(smplData)
+    return np.array(images), classIds, len(pnData)
 
 def main():
     """Create the model and start the evaluation process."""
