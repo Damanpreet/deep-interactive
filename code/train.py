@@ -26,25 +26,23 @@ import pdb
 import tensorflow as tf
 # import numpy as np
 
+from deeplab_resnet.image_reader import BatchDataset
 from deeplab_resnet import DeepLabResNetModel,image_reader, prepare_label
+from deeplab_resnet import cfg
 
-ONLY_POS  = False
-n_classes = 1
 
-BATCH_SIZE     = 10
-DATA_DIRECTORY = ''
-DATA_LIST_PATH  = '/media/zhouzh/LargeDisk/yjl_dataset/CVPPP/CVPPP/converted/train_converted_cvppp.txt'
-INPUT_SIZE    = '321,321'
+BATCH_SIZE = 7
+NUM_EPOCH = 10
 LEARNING_RATE = 1e-5
-MOMENTUM  = 0.9
-NUM_STEPS = 25001
-POWER     = 0.9
-RESTORE_FROM   = './snapshots/model.ckpt-25000'
-# RESTORE_FROM = './snapshots/model.ckpt-500'
+POWER = 0.9
+MOMENTUM = 0.9
+WEIGHT_DECAY = 2.5e-4
+
+#RESTORE_FROM   = '../../../image-annotator-master/deep_interactive/model/PASCAL/pos_neg/model.ckpt-80000'
+RESTORE_FROM = './snapshots/model.ckpt-167000'
 SAVE_NUM_IMAGES = 2
 SAVE_PRED_EVERY = 1000
 SNAPSHOT_DIR = 'snapshots/'
-WEIGHT_DECAY = 0.0001
 
 
 def get_arguments():
@@ -56,19 +54,13 @@ def get_arguments():
     parser = argparse.ArgumentParser(description="DeepLab-ResNet Network")
     parser.add_argument("--batch-size", type=int, default=BATCH_SIZE,
                         help="Number of images sent to the network in one step.")
-    parser.add_argument("--data-dir", type=str, default=DATA_DIRECTORY,
-                        help="Path to the directory containing the PASCAL VOC dataset.")
-    parser.add_argument("--data-list", type=str, default=DATA_LIST_PATH,
-                        help="Path to the file listing the images in the dataset.")
-    parser.add_argument("--input-size", type=str, default=INPUT_SIZE,
-                        help="Comma-separated string with height and width of images.")
     parser.add_argument("--is-training", action="store_true",
                         help="Whether to updates the running means and variances during the training.")
     parser.add_argument("--learning-rate", type=float, default=LEARNING_RATE,
                         help="Base learning rate for training with polynomial decay.")
     parser.add_argument("--momentum", type=float, default=MOMENTUM,
                         help="Momentum component of the optimiser.")
-    parser.add_argument("--num-steps", type=int, default=NUM_STEPS,
+    parser.add_argument("--num-epochs", type=int, default=NUM_EPOCH,
                         help="Number of training steps.")
     parser.add_argument("--power", type=float, default=POWER,
                         help="Decay parameter to compute the learning rate.")
@@ -117,18 +109,21 @@ def load(saver, sess, ckpt_path):
 def main():
     """Create the model and start the training."""
     args = get_arguments()
-    coord = tf.train.Coordinator()
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
     # Load reader.
+    h, w = map(int, cfg.INPUT_SIZE.split(','))
+    c = 4 if cfg.ONLY_POS else 5
+    reader_option = {"resize":True, "resize_size":[h,w]}
+    train_dataset_reader = BatchDataset(reader_option)
+    num_file  = train_dataset_reader.get_image_number()
+    num_steps = args.num_epochs * num_file
 
-    h, w = map(int, args.input_size.split(','))
-    c = 4 if ONLY_POS else 5
+    # Create network.
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
     image_batch  = tf.placeholder(tf.float32, shape=[args.batch_size, h, w, c], name='input')
     label_batch  = tf.placeholder(tf.uint8, shape=[args.batch_size, h, w, 1], name='label')
 
-    # Create network.
     net = DeepLabResNetModel({'data': image_batch}, is_training=args.is_training)
     # For a small batch size, it is better to keep
     # the statistics of the BN layers (running means and variances)
@@ -149,7 +144,7 @@ def main():
     assert(len(all_trainable) == len(fc_trainable) + len(conv1_trainable) + len(conv_trainable))
 
     # Predictions: ignoring all predictions with labels greater or equal than n_classes
-    raw_prediction = tf.reshape(raw_output, [-1, n_classes])
+    raw_prediction = tf.reshape(raw_output, [-1, cfg.num_classes])
     label_proc = prepare_label(label_batch, tf.stack(raw_output.get_shape()[1:3]), one_hot=False) # [batch_size, h, w]
     raw_gt = tf.reshape(label_proc, [-1,])
     raw_prediction = tf.reshape(raw_prediction, [-1,])
@@ -184,7 +179,7 @@ def main():
     # Define loss and optimisation parameters.
     base_lr = tf.constant(args.learning_rate)
     step_ph = tf.placeholder(dtype=tf.float32, shape=())
-    learning_rate = tf.scalar_mul(base_lr, tf.pow(args.power,  step_ph // args.num_steps))
+    learning_rate = tf.scalar_mul(base_lr, tf.pow(args.power,  step_ph // num_steps))
 
     opt_conv  = tf.train.MomentumOptimizer(learning_rate*1, args.momentum)
     opt_fc    = tf.train.MomentumOptimizer(learning_rate*5.0, args.momentum)
@@ -201,6 +196,12 @@ def main():
 
     train_op = tf.group(train_op_conv, train_op_fc, train_op_conv1)
 
+    # evaluation
+    # yjl::check the update operation
+    pred = tf.argmax(raw_predictions, axis=-1)
+    mIoU, update_op = tf.contrib.metrics.streaming_mean_iou(pred, raw_gt, num_classes=n_classes, weights=weights)
+
+
     # Set up tf session and initialize variables.
     config = tf.ConfigProto(allow_soft_placement=True)
     config.gpu_options.allow_growth = True
@@ -216,16 +217,12 @@ def main():
     # load_var_list = [v for v in restore_var if ('conv1' not in v.name) and ('fc1_voc12' not in v.name)]
     if args.restore_from is not None:
         loader = tf.train.Saver(var_list=restore_var)
+        # loader = tf.train.Saver(var_list=load_var_list)
         load(loader, sess, args.restore_from)
 
-    ## Start queue threads.
     pdb.set_trace()
-    threads = tf.train.start_queue_runners(coord=coord, sess=sess)
 
-    reader_option = {"resize":True, "resize_size":[h,w]}
-    train_dataset_reader = image_reader.BatchDataset(args.data_dir, args.data_list, reader_option) # parameter
-
-    for step in range(args.num_steps):
+    for step in range(num_steps):
         start_time = time.time()
         images, labels = train_dataset_reader.next_batch(args.batch_size)
         feed_dict = {image_batch:images, label_batch:labels, step_ph:step}
@@ -237,9 +234,8 @@ def main():
             save(saver, sess, args.snapshot_dir, step)
         loss_value, inf_loss, l2_loss, _ = sess.run([reduced_loss, loss, l2_losses, train_op], feed_dict=feed_dict)
         duration = time.time() - start_time
-        print('step {:d} \t loss = {:.3f},  ({:.3f} sec/step)'.format(step, loss_value, duration))
-    coord.request_stop()
-    coord.join(threads)
+        epoch = (int)(step*args.batch_size/num_file)
+        print('epoch {:d} /step {:d} \t loss = {:.3f},  ({:.3f} sec/step)'.format(epoch, step, loss_value, duration))
 
 if __name__ == '__main__':
     main()

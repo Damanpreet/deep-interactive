@@ -2,6 +2,8 @@ import numpy as np
 from tifffile import imread as tiff_imread
 import cv2
 import scipy.misc as misc
+import os.path as osp
+from .config_pascal import cfg
 import pdb
 ''' Class BatchDataset used to read data batch by batch. the output is a ndarray with
 (batch_size, ht, wd, ch)
@@ -18,11 +20,7 @@ import pdb
 -- batch_offset: indicate where the batch goes.
 '''
 
-ONLY_POS = False
-IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434, 100.0, 100.0), dtype=np.float32)
 class BatchDataset:
-    data_dir = []
-    data_txt = []
     image_options = {}
 
     image_list = []
@@ -33,37 +31,39 @@ class BatchDataset:
     batch_perm   = []
     batch_offset = 0
 
-    def __init__(self, data_dir, data_txt, image_options={}):
+    def __init__(self, image_options={}):
         print("Initializing Batch Dataset Reader...")
         print(image_options)
-        self.data_dir = data_dir
-        self.data_txt = data_txt
         self.image_options = image_options
 
         self.parse_data_list()
         self.image_num = len(self.image_list)
         self.batch_perm = np.arange(self.image_num)
 
+    def get_image_number(self):
+        return self.image_num
+
     def parse_data_list(self):
-        f = open(self.data_txt,'r')
+        f = open(cfg.TRAIN_LIST,'r')
         for line in f:
             try:
-                image, pnmap, label = line.strip("\n").split(' ')
+                img_name, sample_name = line.strip("\n").split(' ')
             except ValueError:
-                image = pnmap = label = line.strip("\n")
-            self.image_list.append(self.data_dir + image)
-            self.pnmap_list.append(self.data_dir + pnmap)
-            self.label_list.append(self.data_dir + label)
+                img_name = sample_name = line.strip("\n")
+
+            self.image_list.append(osp.join(cfg.RGB_PATH, img_name+cfg.RGB_EXT))
+            self.pnmap_list.append(osp.join(cfg.PNSAMPLE_PATH, sample_name+cfg.PNSAMPLE_EXT))
+            self.label_list.append(osp.join(cfg.GT_PATH, sample_name+cfg.GT_EXT))
 
     def read_batch_images_from_disk(self, file_list, flipH=False):
 
         images = np.array([self.transform(self.image_list[k], flipH, 'rgb') for k in file_list])
         pnmaps = np.array([self.transform(self.pnmap_list[k], flipH, 'tiff') for k in file_list])
-        labels = np.array([self.transform(self.label_list[k], flipH, 'grey') for k in file_list])
+        labels = np.array([self.transform(self.label_list[k], flipH, 'tiff') for k in file_list])
 
-        pnmaps = pnmaps[..., 0] if ONLY_POS else pnmaps
-        images = np.concatenate((images, pnmaps[..., np.newaxis]), axis=3) if ONLY_POS else np.concatenate((images, pnmaps), axis=3)
-        images = np.float32(images) - IMG_MEAN[:4] if ONLY_POS else np.float32(images) - IMG_MEAN
+        pnmaps = pnmaps[..., 0] if cfg.ONLY_POS else pnmaps
+        images = np.concatenate((images, pnmaps[..., np.newaxis]), axis=3) if cfg.ONLY_POS else np.concatenate((images, pnmaps), axis=3)
+        images = np.float32(images) - cfg.IMG_MEAN[:4] if cfg.ONLY_POS else np.float32(images) - cfg.IMG_MEAN
         labels = labels[..., np.newaxis]
         labels[labels>0] = 1
         return images, labels
@@ -73,7 +73,8 @@ class BatchDataset:
     def transform(self, file_name, flipH=False, file_type=None):
         if file_type=='tiff':
             image = tiff_imread(file_name)
-            image = np.transpose(image, [1, 2, 0])
+            if(len(image.shape) ==3):
+                image = np.transpose(image, [1, 2, 0])
         elif file_type == 'grey':
             image = misc.imread(file_name, mode='P')
         else:

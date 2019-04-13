@@ -8,7 +8,7 @@ __C = edict()
 cfg = __C
 
 # Maximum margin to pick up samples around objects
-__C.D = 30
+__C.D = 20
 
 
 # strategy3 margin
@@ -16,40 +16,39 @@ __C.NEG3_MARGIN = 10
 
 
 # margin size for candidate pixels
-__C.D_MARGIN = 8
+__C.D_MARGIN = 10
 
 # Ratio factor for determine the distance among pixels
 __C.RATIO_FACTOR = 2.
 
 
 # INPUT DataSet Attribute
-# __C.TXT_PATH = '/home/yuanjial/NeuralNetwork/FilePreprocess/coco/train.txt'
-# __C.BASE_DIR = '/home/yuanjial/DataSet/COCO/coco2014_train'
+__C.DATASET  = 'train'
+__C.TXT_PATH = './dataset/pascal/'+__C.DATASET +'.txt'
+__C.BASE_DIR = './dataset/pascal/PASCAL/'
 
-__C.TXT_PATH = '/media/wenxuan/LargeDisk/yjl_dataset/CVPPP/train.txt'
-__C.BASE_DIR = '/media/wenxuan/LargeDisk/yjl_dataset/CVPPP'
-
-__C.IMG_DIR = 'JPEGImages'
+__C.IMG_DIR = osp.join(__C.BASE_DIR, 'sourceData/JPEGImages')
 __C.IMG_EXT = '.jpg'
 
-__C.INSTANCEANN_DIR = 'SegmentationObjectFilledDenseCRF'
+#__C.INSTANCEANN_DIR = osp.join(__C.BASE_DIR, 'sourceData/Merge_VOC_SBD/inst/')
+__C.INSTANCEANN_DIR = osp.join(__C.BASE_DIR, 'sourceData/CRF-Refine-Ann/SegmentationObjectFilledDenseCRF/')
 __C.GT_EXT = '.png'
 
 # directory to store converted tiff files
-__C.OUT_PATH = 'CVPPP/converted'
-__C.OUT_FNAME = 'train_converted_cvppp.txt'
+__C.OUT_PATH = osp.join(__C.BASE_DIR, 'sample_PN_converted')
+__C.OUT_TXT_PATH = osp.join(__C.OUT_PATH, __C.DATASET+'_converted_pascal.txt')
 
 # Number of positive sampels
-__C.N_POS = 2
+__C.N_POS = 5
 
 # Number of negative samples
-__C.N_NEG = 8
+__C.N_NEG = 30
 
 # Number of pairs
-__C.N_PAIRS = 5
+__C.N_PAIRS = 3
 
 # Energy scale in distrance transform
-__C.ENERGY_SCALE = 5
+__C.ENERGY_SCALE = 6
 
 # Training phase configures
 __C.TRAIN = edict()

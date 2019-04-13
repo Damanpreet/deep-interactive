@@ -8,20 +8,16 @@ from __future__ import print_function
 import argparse
 import os
 import time
-# import pdb
+
 import cv2
+import numpy as np
+from matplotlib import image # , cm
 from tifffile import imread as tiff_imread
 
-from matplotlib import image # , cm
 import tensorflow as tf
-import numpy as np
-from deeplab_resnet import DeepLabResNetModel #, decode_labels, prepare_label
 
-ONLY_POS = False
-DATA_DIRECTORY = ''
-DATA_LIST_PATH  = '/media/zhouzh/LargeDisk/yjl_dataset/CVPPP/CVPPP/converted/val_converted_cvppp.txt'
-SAVE_DIR = './output_cvppp/'
-IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434, 156.042324, 156.523433), dtype=np.float32)
+from deeplab_resnet import cfg
+from deeplab_resnet import DeepLabResNetModel #, decode_labels, prepare_label
 
 def get_arguments():
     """Parse all the arguments provided from the CLI.
@@ -32,9 +28,7 @@ def get_arguments():
     parser = argparse.ArgumentParser(description="DeepLabLFOV Network Inference.")
     parser.add_argument("model_weights", type=str,
                         help="Path to the file with model weights.")
-    parser.add_argument("--img_path", type=str, default=DATA_DIRECTORY,
-                        help="Path to the RGB image file.")
-    parser.add_argument("--save-dir", type=str, default=SAVE_DIR,
+    parser.add_argument("--save-dir", type=str, default=cfg.OUT_PATH,
                         help="Where to save predicted mask.")
     return parser.parse_args()
 
@@ -51,30 +45,29 @@ def load(saver, sess, ckpt_path):
 
 def read_image_list():
     '''
-     output: rgbList: list of path to rgbimages
-             pnList: list of path to sample pos/neg map packages.
-             labelList: list of path to labels
+     output: img_list: list of fname to rgbimages
+             sample_list: list of fname to sample pos/neg map packages and its label.
     '''
-    f = open(DATA_LIST_PATH, 'r')
-    imgList, pnList, labelList = [], [], []
-    for line in f:
-        rgbImg, pnImg, labelImg = line.strip("\n").split(' ')
+    img_list, sample_list = [], []
+    with open(cfg.VAL_LIST, 'r') as f:
+        for line in f:
+            img_name, sample_name = line.split()
 
-        imgList.append(DATA_DIRECTORY + rgbImg)
-        pnList.append(DATA_DIRECTORY + pnImg)
-        labelList.append(DATA_DIRECTORY + labelImg)
+            img_list.append(img_name)
+            sample_list.append(sample_name)
 
-    return imgList, pnList, labelList
+    return img_list, sample_list
 
 
 
 def main():
     """Create the model and start the evaluation process."""
     args = get_arguments()
+    os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
     # Prepare image.
-    imgList, pnList, labelList = read_image_list()
-    ch = 4 if ONLY_POS else 5
+    img_list, sample_list = read_image_list()
+    ch = 4 if cfg.ONLY_POS else 5
 
     # Create network.
     with tf.device('/cpu:0'):
@@ -85,7 +78,7 @@ def main():
         restore_var = tf.global_variables()
 
         # Predictions.
-        raw_output     = net.layers['fc1_voc12']
+        raw_output     = tf.sigmoid(net.layers['fc1_voc12'])
         raw_output_up  = tf.image.resize_bilinear(raw_output, tf.shape(input_imgs)[1:3,])
         preds          = tf.greater_equal(tf.nn.softmax(raw_output_up), 0.5)
         preds          = tf.cast(preds, tf.uint8)
@@ -108,34 +101,34 @@ def main():
 
     import pdb
     pdb.set_trace()
-    for rgbPath, pnPath, labelPath in zip(imgList, pnList, labelList):
-        save_fname = pnPath.split('/')[-1]
-        save_fname = save_fname.split('.')[0]
+    for img_name, sample_name in zip(img_list, sample_list):
+        rgbPath   = os.path.join(cfg.RGB_PATH, img_name+cfg.RGB_EXT)
+        pnPath    = os.path.join(cfg.PNSAMPLE_PATH, sample_name+cfg.PNSAMPLE_EXT)
+        labelPath = os.path.join(cfg.GT_PATH, sample_name+cfg.GT_EXT)
 
         # Perform inference.
         rgbimg = cv2.imread(rgbPath)
         pnmaps = tiff_imread(pnPath)
-        pnmaps = pnmaps[0, ...] if ONLY_POS else np.transpose(pnmaps, [1,2,0])
-        pnmaps = pnmaps[..., np.newaxis] if ONLY_POS else pnmaps
+        pnmaps = pnmaps[0, ...] if cfg.ONLY_POS else np.transpose(pnmaps, [1,2,0])
+        pnmaps = pnmaps[..., np.newaxis] if cfg.ONLY_POS else pnmaps
 
         start_time = time.time();
-        inData = np.concatenate((rgbimg, pnmaps), axis=2)
-        inData = np.float32(inData)-IMG_MEAN[0:4] if ONLY_POS else np.float32(inData)-IMG_MEAN
-        if(inData.shape[-1] != 5):
-            continue;
+        inData     = np.concatenate((rgbimg, pnmaps), axis=2)
+        inData     = np.float32(inData)-cfg.IMG_MEAN[0:4] if cfg.ONLY_POS else np.float32(inData)-cfg.IMG_MEAN
 
-        #rOutput, preds = sess.run([raw_output_up, preds], feed_dict={input_imgs:inData[np.newaxis, ...]})
-        rOutput = sess.run(raw_output_up, feed_dict={input_imgs:inData[np.newaxis, ...]})
+        rOutput    = sess.run(raw_output_up, feed_dict={input_imgs:inData[np.newaxis, ...]})
+        rOutput    = rOutput.squeeze()
+        img        = np.zeros(rgbimg.shape)
+        img[:,:,0] = rOutput*255
+        img        = rgbimg[..., [2,0,1]]*0.6 + img*0.5
+        img[img>255] = 255
+        img          = img.astype(np.uint8)
 
-        #rOutput = 1/(1+np.exp(-rOutput))*255
-        #img  = np.concatenate((rOutput[0], pnmaps), axis=2)
-        img = rOutput.squeeze()
-
-        # image.imsave(args.save_dir+ save_fname +'.png', preds.squeeze()*200, cmap = cm.gray, vmin=0, vmax=255 )
-        image.imsave(args.save_dir+ save_fname +'_color.png', img) #, cmap = cm.gray, vmin=0, vmax=255 )
+        # image.imsave(args.save_dir+ sample_fname +'.png', preds.squeeze()*200, cmap = cm.gray, vmin=0, vmax=255 )
+        image.imsave(args.save_dir+ sample_name +'_color.png', img) #, cmap = cm.gray, vmin=0, vmax=255 )
         duration = time.time()-start_time
 
-        print('The output file {} has been saved to {}. -- time: {:.3f} sec/({:d}, {:d})'.format(save_fname, args.save_dir, duration, img.shape[0], img.shape[1]))
+        print('The output file {} has been saved to {}. -- time: {:.3f} sec/({:d}, {:d})'.format(sample_name, args.save_dir, duration, img.shape[0], img.shape[1]))
 
 
 if __name__ == '__main__':

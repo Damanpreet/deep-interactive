@@ -8,7 +8,7 @@ import numpy as np
 import scipy.ndimage.morphology as smorpho
 import random as ran
 import argparse
-from tifffile import imsave
+from tifffile import imsave as tImsave
 
 from cfg.config import cfg
 
@@ -38,17 +38,17 @@ def euclidean_dis(p1, p2):
     return np.linalg.norm(p1-p2)
 
 
-def sample_cands(candidates, is_fixed, num, criteria, *args):
+def sample_cands(candidates, is_fixed, min_num, max_num, criteria, *args):
     res = []
 
     if not is_fixed:
-        num = max(ran.choice(range(num)), num/2)
+        num = ran.choice(range(min_num, max_num))
 
     # to prevent deadlock when there are no enough points to satisfy the criteria
     cnt = 0
 
     # Collecting num points
-    while len(res) != num and cnt < 500:
+    while len(res) != num and cnt < 100:
         cnt += 1
         cand = ran.choice(candidates)
 
@@ -84,11 +84,18 @@ def _compute_step(ys, xs):
 
     return d_step
 
+def _erosion_and_remove(valid_area, erode_dim=(2*cfg.D_MARGIN+1, 2*cfg.D_MARGIN+1)):
+    erode_kernel = np.ones(erode_dim)
+    erode = cv2.erode(valid_area, erode_kernel, iterations=1)
+    donut = valid_area - erode
+    return donut
+
 
 def _erosion(valid_area, erode_dim=(2*cfg.D_MARGIN+1, 2*cfg.D_MARGIN+1)):
     # Fixed 3 by 3 erosion
     erode_kernel = np.ones(erode_dim)
     erode = cv2.erode(valid_area, erode_kernel, iterations=1)
+
     return erode
 
 def _dilation_and_remove(valid_area, dilation_dim=(2*cfg.D+1, 2*cfg.D+1)):
@@ -107,24 +114,19 @@ def _dilation_and_remove_and_erosion(valid_area):
     return erode
 
 
-def _filter_samples(path, is_fixed, morphology, num=cfg.N_POS):
+def _filter_samples(img_arr, is_fixed, morphology, min_num=0, max_num=cfg.N_POS):
     '''Sampling points from the pixels that get from morphology function for each object
     based on following rules:
         1. Any two pixels are at least d_step pixels away from each other;
         2. Any pixels is at least d_margin pixels away from object boundaries;
 
-    @path: image path
+    @img_arr: instance label image
     @morphology: function to get desired sample area
     output: a dictionary of positive points for each object per entry
     '''
     locs = {}
-    if not path:
-        return locs
-
-    img_arr = smisc.imread(path, mode='P')
 
     obj_lst = np.unique(img_arr[img_arr != 0])
-
 
     d_step = 1
 
@@ -136,7 +138,6 @@ def _filter_samples(path, is_fixed, morphology, num=cfg.N_POS):
 
 
     for obj, mapping in obj_mappings.items():
-
 
         # Get desired sample area
         morph = morphology(mapping)
@@ -154,7 +155,7 @@ def _filter_samples(path, is_fixed, morphology, num=cfg.N_POS):
 
 
         # Sample points from candidates
-        samples = sample_cands(candidates, is_fixed, num, dis_criteria, d_step)
+        samples = sample_cands(candidates, is_fixed, min_num, max_num, dis_criteria, d_step)
         locs[obj].extend(samples)
 
         #for s in samples:
@@ -170,27 +171,27 @@ def _filter_samples(path, is_fixed, morphology, num=cfg.N_POS):
     return locs
 
 
-def pos_strategy(path, num_poss=cfg.N_POS):
+def pos_strategy(img_arr, num_poss=cfg.N_POS):
     '''Positive points sampling strategy.
-    @path: image path
+    @img_arr: instance label image
     @output: a dictionary of sampled negative points
     '''
-    return _filter_samples(path, False, _erosion, num_poss)
+    return _filter_samples(img_arr, False, _erosion_and_remove, 0, num_poss)
 
 
-def neg_strategy1(path, num_negs=cfg.N_NEG):
+def neg_strategy1(img_arr, num_negs=cfg.N_NEG):
     '''Negative points sampling strategy 1.
+    @img_arr: instance label image
     @num_negs: number of negative points needed to be sampled
-    @path: image path
     output: a dictionary of sampled negative points
     '''
-    return _filter_samples(path, False, _dilation_and_remove, num_negs)
+    return _filter_samples(img_arr, False, _dilation_and_remove, (2*num_negs)//3, num_negs)
 
 
-def neg_strategy2(path, num_negs=cfg.N_NEG):
+def neg_strategy2(img_arr, num_negs=cfg.N_NEG):
     '''Negative points sampling strategy 2.
+    @img_arr: instance label image
     @num_negs: number of negative points needed to be sampled
-    @path: idef f(x):
     return {
         'a': 1,
         'b': 2,
@@ -198,10 +199,6 @@ def neg_strategy2(path, num_negs=cfg.N_NEG):
     output: a dictionary of sampled negative points
     '''
     locs = {}
-    if not path:
-        return locs
-
-    img_arr = cv2.imread(path, 0)
 
     obj_lst = np.unique(img_arr[img_arr != 0])
 
@@ -225,7 +222,7 @@ def neg_strategy2(path, num_negs=cfg.N_NEG):
 
                 candidates = np.array(list(zip(*np.where(morph == other_obj))))
 
-                samples = sample_cands(candidates, False, num_negs, dis_criteria, d_step)
+                samples = sample_cands(candidates, False, (2*num_negs)//3, num_negs, dis_criteria, d_step)
 
                 locs[obj].extend(samples)
 
@@ -241,13 +238,13 @@ def neg_strategy2(path, num_negs=cfg.N_NEG):
 
     return locs
 
-def neg_strategy3(path, num_negs=cfg.N_NEG):
+def neg_strategy3(img_arr, num_negs=cfg.N_NEG):
     '''Negative points sampling strategy 3.
+    @img_arr: instance label image
     @num_negs: number of negative points needed to be sampled
-    @path: image path
     output: a dictionary of sampled negative points
     '''
-    return _filter_samples(path, True, _dilation_and_remove_and_erosion, num_negs)
+    return _filter_samples(img_arr, True, _dilation_and_remove_and_erosion, num_negs)
 
 
 def cat_channels(gt):
@@ -266,8 +263,8 @@ def cat_channels(gt):
     h, w    = gt_arr.shape
 
     for n in range(cfg.N_PAIRS):
-        pos_samples = pos_strategy(gt)
-        neg_samples = neg_strategy1(gt)
+        pos_samples = pos_strategy(gt_arr)
+        neg_samples = neg_strategy1(gt_arr)
 
         # neg_samples = [neg_strategy1, neg_strategy2, neg_strategy3]
         # idx = n // (cfg.N_PAIRS)
@@ -293,14 +290,17 @@ def construct_channels(samples, h, w):
     energies = {}
     for obj, lst in samples.items():
         mask_obj    = np.ones((h, w))
-        for pt in lst:
-            mask_obj[pt[0],pt[1]] = 0
+        if(len(lst)==0):
+            energy = mask_obj*255
+        else:
+            for pt in lst:
+                mask_obj[pt[0],pt[1]] = 0
 
-        energy = smorpho.distance_transform_edt(mask_obj)
-        energy = energy * cfg.ENERGY_SCALE
-        energy[energy>255] = 255
-        energy             = np.uint8(energy)
+            energy = smorpho.distance_transform_edt(mask_obj)
+            energy = energy * cfg.ENERGY_SCALE
+            energy[energy>255] = 255
 
+        energy        = np.uint8(energy)
         energy        = energy[:, :, np.newaxis]
         energies[obj] = energy
 
@@ -320,22 +320,16 @@ def create_dir(dir_name):
 
 def main():
 
-    # args = argparser()
-
-    # gts, filenames = load_image_path(osp.join(cfg.BASE_DIR, cfg.INSTANCEANN_DIR), cfg.GT_EXT)
-    # images, _ = load_image_path(osp.join(cfg.BASE_DIR, cfg.IMG_DIR), cfg.IMG_EXT)
     with open(cfg.TXT_PATH) as f:
         image_list = f.read().splitlines()
-    gts, images, filenames = [], [], []
-    for idx, ele in enumerate(image_list):
-        im_path, gt_path = ele.split()
-        fname = format(idx, '05d')
-        gts.append(gt_path)
-        images.append(im_path)
+
+    gts, filenames = [], []
+    for fname in image_list:
+        gts.append(osp.join(cfg.INSTANCEANN_DIR, fname+cfg.GT_EXT))
         filenames.append(fname)
 
 
-    output_path = osp.join(osp.join(cfg.BASE_DIR, cfg.OUT_PATH))
+    output_path = cfg.OUT_PATH
     create_dir(output_path)
 
     labels_dir = osp.join(output_path, 'labels')
@@ -344,38 +338,35 @@ def main():
     data_dir = osp.join(output_path, 'data')
     create_dir(data_dir)
 
-    train_txt = open(osp.join(output_path, cfg.OUT_FNAME), 'w+')
+    train_txt = open(cfg.OUT_TXT_PATH, 'w+')
     train_txt.truncate()
 
-    for idx, (image, gt, fn) in enumerate(zip(images, gts, filenames)):
-        if idx > 5000:
-            break
-        import pdb
-        pdb.set_trace()
-        pairs = cat_channels(gt)
+    for idx, (gt, fname) in enumerate(zip(gts, filenames)):
+        # import pdb
+        # pdb.set_trace()
+        if(not os.path.isfile(gt)):
+            continue
 
+        pairs = cat_channels(gt)
 
         data = np.array(pairs['data'], dtype=np.uint8)
         labels = np.array(pairs['labels'], dtype=np.uint8)
 
         for i in range(data.shape[0]):
             sample = data[i,...]
-            label = labels[i,...]
+            label  = labels[i,...]
 
             sample = sample.transpose((2, 0, 1))
 
-            new_name = fn + '-' + str(i) + '_train.tif'
-            new_label_name = fn + '-' + str(i) + '_train.tif'
+            new_name   = fname + '-' + str(i)
+            file_path  = osp.join(data_dir, new_name+'_pnsamples.tif')
+            label_path = osp.join(labels_dir, new_name+'_label.tif')
 
-            file_path = osp.join(data_dir, new_name)
-            label_path = osp.join(labels_dir, new_label_name)
+            train_txt.write(fname + ' ' + new_name + '\n')
+            tImsave(file_path, sample, compress=6)
+            tImsave(label_path, label*255, compress=6)
 
-            train_txt.write(image + ' ' + file_path + ' ' + label_path + '\n')
-
-            #imsave(file_path, sample, compress=6)
-            #imsave(label_path, label, compress=6)
-
-        print('image {} done!, counter={}'.format(fn, idx))
+        print('image {} done!, counter={}'.format(fname, idx))
 
     train_txt.close()
 
