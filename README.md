@@ -1,20 +1,11 @@
-# DeepLab-ResNet-TensorFlow
+# Interactive-Object-Selection TensorFlow
 
-[![Build Status](https://travis-ci.org/DrSleep/tensorflow-deeplab-resnet.svg?branch=master)](https://travis-ci.org/DrSleep/tensorflow-deeplab-resnet)
+This is an Interative Object Selection model which utilizes Deeplab-ResNet model (Deeplab v2) as 
+the backbone network. The model is trained on PASCAL VOC dataset which is publicly available online.
 
-This is an (re-)implementation of [DeepLab-ResNet](http://liangchiehchen.com/projects/DeepLabv2_resnet.html) in TensorFlow for semantic image segmentation on the [PASCAL VOC dataset](http://host.robots.ox.ac.uk/pascal/VOC/).
+The original implementation of the Deeplab-Resnet used in this repository is from [here].
+(https://github.com/DrSleep/tensorflow-deeplab-resnet/tree/crf)
 
-## Updates
-
-**29 Jan, 2017**:
-* Fixed the implementation of the batch normalisation layer: it now supports both the training and inference steps. If the flag `--is-training` is provided, the running means and variances will be updated; otherwise, they will be kept intact. The `.ckpt` files have been updated accordingly - to download please refer to the new link provided below.
-* Image summaries during the training process can now be seen using TensorBoard.
-* Fixed the evaluation procedure: the 'void' label (<code>255</code>) is now correctly ignored. As a result, the performance score on the validation set has increased to <code>80.1%</code>.
-
-**11 Feb, 2017**:
-* The training script `train.py` has been re-written following the original optimisation setup: SGD with momentum, weight decay, learning rate with polynomial decay, different learning rates for different layers, ignoring the 'void' label (<code>255</code>).
-* The training script with multi-scale inputs `train_msc.py` has been added: the input is resized to <code>0.5</code> and <code>0.75</code> of the original resolution, and <code>4</code> losses are aggregated: loss on the original resolution, on the <code>0.75</code> resolution, on the <code>0.5</code> resolution, and loss on the all fused outputs.
-* Evaluation of a single-scale converted pre-trained model on the PASCAL VOC validation dataset (using ['SegmentationClassAug'](https://www.dropbox.com/s/oeu149j8qtbs1x0/SegmentationClassAug.zip?dl=0)) leads to <code>86.9%</code> mIoU. This is confirmed by [the official PASCAL VOC server](http://host.robots.ox.ac.uk/anonymous/FIQPRH.html). The score on the test dataset is [<code>75.8%</code>](http://host.robots.ox.ac.uk/anonymous/EPBIGU.html).
 
 ## Model Description
 
@@ -26,7 +17,6 @@ On the test set of PASCAL VOC, the model achieves <code>79.7%</code> of mean int
 
 For more details on the underlying model please refer to the following paper:
 
-
     @article{CP2016Deeplab,
       title={DeepLab: Semantic Image Segmentation with Deep Convolutional Nets, Atrous Convolution, and Fully Connected CRFs},
       author={Liang-Chieh Chen and George Papandreou and Iasonas Kokkinos and Kevin Murphy and Alan L Yuille},
@@ -34,14 +24,37 @@ For more details on the underlying model please refer to the following paper:
       year={2016}
     }
 
+The criterion to sample the positive and negative clicks for training and testing is taken from the paper.
+Authors: N. Xu, B. Price, S. Cohen, J. Yang, and T. S. Huang
+
+Deep Interactive Object Selection - N Xu et al., 2016 CVPR
+- positive and negative clicks
+- FCN + refinement by Graph Cut
+
+Bibtex
+If you find this code useful, please site the above two papers.
 
 
-## Requirements
+Contents:
+1. Environment Setup
+2. Training Model
+3. Testing Model performance
+4. Demo
 
-TensorFlow needs to be installed before running the scripts.
-TensorFlow 0.12 is supported; for TensorFlow 0.11 please refer to this [branch](https://github.com/DrSleep/tensorflow-deeplab-resnet/tree/tf-0.11).
+1. Environment Setup:
 
-To install the required python packages (except TensorFlow), run
+The code has been tested on Ubuntu and uses Python 3.6, Tensorflow.
+
+- Clone this repository 
+https://github.com/jia2lin3yuan1/deep-interactive.git
+
+- Setup Python environment
+
+conda create -n objselect python==3.6 
+source activate objselect
+
+To install the required python packages, run:
+pip install Tensorflow (check the correct way to install tf)
 ```bash
 pip install -r requirements.txt
 ```
@@ -49,6 +62,7 @@ or for a local installation
 ```bash
 pip install -user -r requirements.txt
 ```
+
 
 ## Caffe to TensorFlow conversion
 
@@ -65,16 +79,38 @@ As a result of running the command above, the model weights will be stored in `/
 python npy2ckpt.py /where/to/save/numpy/weights --save-dir=/where/to/save/ckpt/weights
 ```
 
-## Dataset and Training
+2. Dataset and Training
 
 To train the network, one can use the augmented PASCAL VOC 2012 dataset with <code>10582</code> images for training and <code>1449</code> images for validation.
 
-The training script allows to monitor the progress in the optimisation process using TensorBoard's image summary. Besides that, one can also exploit random scaling of the inputs during training as a means for data augmentation. For example, to train the model from scratch with random scale turned on, simply run:
-```bash
-python train.py --random-scale
-```
+Copy the caffee to Tensorflow conversion
 
-<img src="images/summary.png"></img>
+To use pretrained model, download from here. (Provide link)
+
+- Setup the environment using the steps described above.
+- Download PASCAL VOC dataset from [here](http://host.robots.ox.ac.uk/pascal/VOC/voc2012/index.html#data).
+
+Your directory data structure should look like -
+'''bash
+
+
+
+Give a figure to describe the directory structure
+
+
+
+'''
+
+To run the sample clicks, modify the configuration file.
+Configuration File path for sample clicks: 
+
+Run the command:
+python sample_clicks.py
+
+After the above setup is complete, simply run:
+```bash
+python train.py 
+```
 
 To see the documentation on each of the training settings run the following:
 
@@ -85,28 +121,28 @@ python train.py --help
 An additional script, `fine_tune.py`, demonstrates how to train only the last layers of the network. The script `train_msc.py` with multi-scale inputs fully resembles the training setup of the original model. 
 
 
-## Evaluation
+3. Testing Model performance
 
-The single-scale model shows <code>86.9%</code> mIoU on the Pascal VOC 2012 validation dataset (['SegmentationClassAug'](https://www.dropbox.com/s/oeu149j8qtbs1x0/SegmentationClassAug.zip?dl=0)). No post-processing step with CRF is applied.
-
-The following command provides the description of each of the evaluation settings:
+- Setup the environment using the steps described above.
+- The following command provides the description of each of the evaluation settings:
 ```bash
 python evaluate.py --help
 ```
 
-## Inference
+4. Demo
 
-To perform inference over your own images, use the following command:
+- Setup the environment using the steps described above.
+- Download the pretrained model from the following link:
+- To perform inference over your own images, use the following command:
 ```bash
 python inference.py /path/to/your/image /path/to/ckpt/file
 ```
-This will run the forward pass and save the resulted mask with this colour map:
-<img src="images/colour_scheme.png" height="75"></img>
-<img src="images/mask.png"></img>
+
+This will save the result with the name: 
 
 ## Missing features
 
-The post-processing step with CRF is currently being implemented in [this branch](https://github.com/DrSleep/tensorflow-deeplab-resnet/tree/crf).
+The post-processing step with CRF is currently being implemented. 
 
     
 ## Other implementations
