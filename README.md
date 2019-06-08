@@ -58,21 +58,20 @@ conda create -n objselect python==3.6
 source activate objselect
 ```
 
-To install the required python packages, run:
-```bash
-pip install tensorflow==1.12.1
-```
-
 1. Change directory
 ```bash
 cd deep-interactive/code/
 ```
 
-2.
+2. To install the required python packages, run:
+```bash
+pip install tensorflow==1.12.1
+```
+
 ```bash
 pip install -r requirements.txt
 ```
-or for a local installation
+   or for a local installation
 ```bash
 pip install -user -r requirements.txt
 ```
