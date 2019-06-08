@@ -63,7 +63,10 @@ To install the required python packages, run:
 pip install tensorflow==1.12.1
 ```
 
-1. cd deep-interactive/code/
+1. Change directory
+```bash
+cd deep-interactive/code/
+```
 
 2.
 ```bash
