@@ -36,11 +36,11 @@ If you find this code useful, please site the above two papers.
 
 
 Contents:
-1. Environment Setup
-2. Pretrained model
-3. Training Model
-4. Testing Model performance
-5. Demo
+1. [Environment Setup](## Environment Setup)
+2. [Pretrained model](## Pretrained model) / [Caffe to TensorFlow conversion](## Caffe to TensorFlow conversion)
+3. [Training](## Dataset and Training)
+4. [Testing](## Testing Model performance)
+5. [Demo](## Demo)
 
 
 ## Environment Setup:
@@ -107,7 +107,7 @@ You can optionally use this script to download the dataset:
 https://github.com/tensorflow/models/blob/master/research/deeplab/datasets/download_and_convert_ade20k.sh
 
 
-### Sample clicks
+#### Sample clicks
 1. To run the sample clicks, modify the configuration file.
 Configuration File path for sample clicks: 
 ```bash
@@ -121,7 +121,7 @@ Carefully modify the parameters for training and testing.
 python sample_clicks.py
 ```
 
-### Train
+#### Train
 Configuration File path for train file: 
 ```bash
 deeplab_resnet/config_pascal.py
@@ -148,7 +148,7 @@ An additional script, `fine_tune.py`, demonstrates how to train only the last la
 
 - Setup the environment using the steps described above.
 
-### Sample clicks
+#### Sample clicks
 1. To run the sample clicks, modify the configuration file.
 Configuration File path for sample clicks: 
 ```bash
@@ -162,7 +162,7 @@ Carefully modify the parameters for training and testing.
 python sample_clicks.py
 ```
 
-### Evaluate
+#### Evaluate
 The following command provides the description of each of the evaluation settings:
 ```bash
 python evaluate.py --help
@@ -175,7 +175,7 @@ python evaluate.py --help
 - Download the pretrained model from the [link](https://drive.google.com/open?id=1VEHHBBN2b-eKtvz7rgOS1F4ah0oDW76P) 
 - To generate the sample clicks for your image:
 
-### Sample clicks
+#### Sample clicks
 1. To run the sample clicks, modify the configuration file.
 Configuration File path for sample clicks: 
 ```bash
@@ -192,7 +192,7 @@ python sample_clicks.py
 deeplab_resnet/config_pascal.py
 ```
 
-### Inference
+#### Inference
 - To perform inference over your own images, use the following command:
 ```bash
 python inference_single.py image_name SampleClick_Name model_weights_directory
