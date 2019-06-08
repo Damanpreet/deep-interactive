@@ -37,12 +37,13 @@ If you find this code useful, please site the above two papers.
 
 Contents:
 1. Environment Setup
-2. Training Model
-3. Testing Model performance
-4. Demo
+2. Pretrained model
+3. Training Model
+4. Testing Model performance
+5. Demo
 
 
-1. Environment Setup:
+## Environment Setup:
 
 The code has been tested on Ubuntu and uses Python 3.6, Tensorflow.
 
@@ -68,11 +69,6 @@ or for a local installation
 pip install -user -r requirements.txt
 ```
 
-
-2. Dataset and Training
-
-To train the network, one can use the augmented PASCAL VOC 2012 dataset with <code>10582</code> images for training and <code>1449</code> images for validation.
-
 ## Caffe to TensorFlow conversion
 
 To imitate the structure of the model, we have used `.caffemodel` files provided by the [authors](http://liangchiehchen.com/projects/DeepLabv2_resnet.html). The conversion has been performed using [Caffe to TensorFlow](https://github.com/ethereon/caffe-tensorflow) with an additional configuration for atrous convolution and batch normalisation (since the batch normalisation provided by Caffe-tensorflow only supports inference). 
@@ -91,12 +87,20 @@ python npy2ckpt.py /where/to/save/numpy/weights --save-dir=/where/to/save/ckpt/w
 ## Pretrained model
 To use pretrained model, download from [here](https://drive.google.com/open?id=1VEHHBBN2b-eKtvz7rgOS1F4ah0oDW76P). 
 
+
+## Dataset and Training
+
+To train the network, one can use the augmented PASCAL VOC 2012 dataset with <code>10582</code> images for training and <code>1449</code> images for validation.
+
+
+
 - Setup the environment using the steps described above.
 - Download PASCAL VOC dataset from [here](http://host.robots.ox.ac.uk/pascal/VOC/voc2012/index.html#data).
 You can optionally use this script to download the dataset:
 https://github.com/tensorflow/models/blob/master/research/deeplab/datasets/download_and_convert_ade20k.sh
 
-## Sample clicks
+
+### Sample clicks
 To run the sample clicks, modify the configuration file.
 Configuration File path for sample clicks: 
 cfg/config.py
@@ -108,7 +112,7 @@ Run the command:
 python sample_clicks.py
 ```
 
-## Train
+### Train
 Configuration File path for train file: 
 deeplab_resnet/config_pascal.py
 
@@ -129,11 +133,11 @@ An additional script, `fine_tune.py`, demonstrates how to train only the last la
 
 
 
-3. Testing Model performance
+## Testing Model performance
 
 - Setup the environment using the steps described above.
 
-## Sample clicks
+### Sample clicks
 To run the sample clicks, modify the configuration file.
 Configuration File path for sample clicks: 
 cfg/config.py
@@ -145,20 +149,20 @@ Run the command:
 python sample_clicks.py
 ```
 
-## Evaluate
+### Evaluate
 The following command provides the description of each of the evaluation settings:
 ```bash
 python evaluate.py --help
 ```
 
 
-4. Demo
+## Demo
 
 - Setup the environment using the steps described above.
 - Download the pretrained model from the [link](https://drive.google.com/open?id=1VEHHBBN2b-eKtvz7rgOS1F4ah0oDW76P) 
 - To generate the sample clicks for your image:
 
-## Sample clicks
+### Sample clicks
 To run the sample clicks, modify the configuration file.
 Configuration File path for sample clicks: 
 cfg/config.py
@@ -173,6 +177,7 @@ python sample_clicks.py
 - Modify the configuration file at the path: 
 deeplab_resnet/config_pascal.py
 
+### Inference
 - To perform inference over your own images, use the following command:
 ```bash
 python inference_single.py image_name SampleClick_Name model_weights_directory
