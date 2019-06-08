@@ -41,6 +41,7 @@ Contents:
 3. Testing Model performance
 4. Demo
 
+
 1. Environment Setup:
 
 The code has been tested on Ubuntu and uses Python 3.6, Tensorflow.
@@ -54,7 +55,11 @@ conda create -n objselect python==3.6
 source activate objselect
 
 To install the required python packages, run:
-pip install Tensorflow (check the correct way to install tf)
+pip install tensorflow==1.12.1
+
+1. cd deep-interactive/code/
+
+2.
 ```bash
 pip install -r requirements.txt
 ```
@@ -63,6 +68,10 @@ or for a local installation
 pip install -user -r requirements.txt
 ```
 
+
+2. Dataset and Training
+
+To train the network, one can use the augmented PASCAL VOC 2012 dataset with <code>10582</code> images for training and <code>1449</code> images for validation.
 
 ## Caffe to TensorFlow conversion
 
@@ -79,33 +88,31 @@ As a result of running the command above, the model weights will be stored in `/
 python npy2ckpt.py /where/to/save/numpy/weights --save-dir=/where/to/save/ckpt/weights
 ```
 
-2. Dataset and Training
-
-To train the network, one can use the augmented PASCAL VOC 2012 dataset with <code>10582</code> images for training and <code>1449</code> images for validation.
-
-Copy the caffee to Tensorflow conversion
-
-To use pretrained model, download from here. (Provide link)
+## Pretrained model
+To use pretrained model, download from [here](https://drive.google.com/open?id=1VEHHBBN2b-eKtvz7rgOS1F4ah0oDW76P). 
 
 - Setup the environment using the steps described above.
 - Download PASCAL VOC dataset from [here](http://host.robots.ox.ac.uk/pascal/VOC/voc2012/index.html#data).
+You can optionally use this script to download the dataset:
+https://github.com/tensorflow/models/blob/master/research/deeplab/datasets/download_and_convert_ade20k.sh
 
-Your directory data structure should look like -
-'''bash
-
-
-
-Give a figure to describe the directory structure
-
-
-
-'''
-
+## Sample clicks
 To run the sample clicks, modify the configuration file.
 Configuration File path for sample clicks: 
+cfg/config.py
+
+Carefully modify the parameters for training and testing.
 
 Run the command:
+```bash
 python sample_clicks.py
+```
+
+## Train
+Configuration File path for train file: 
+deeplab_resnet/config_pascal.py
+
+Modify the path of dataset folder.
 
 After the above setup is complete, simply run:
 ```bash
@@ -118,32 +125,66 @@ To see the documentation on each of the training settings run the following:
 python train.py --help
 ```
 
-An additional script, `fine_tune.py`, demonstrates how to train only the last layers of the network. The script `train_msc.py` with multi-scale inputs fully resembles the training setup of the original model. 
+An additional script, `fine_tune.py`, demonstrates how to train only the last layers of the network. 
+
 
 
 3. Testing Model performance
 
 - Setup the environment using the steps described above.
-- The following command provides the description of each of the evaluation settings:
+
+## Sample clicks
+To run the sample clicks, modify the configuration file.
+Configuration File path for sample clicks: 
+cfg/config.py
+
+Carefully modify the parameters for training and testing.
+
+Run the command:
+```bash
+python sample_clicks.py
+```
+
+## Evaluate
+The following command provides the description of each of the evaluation settings:
 ```bash
 python evaluate.py --help
 ```
 
+
 4. Demo
 
 - Setup the environment using the steps described above.
-- Download the pretrained model from the following link:
-- To perform inference over your own images, use the following command:
+- Download the pretrained model from the [link](https://drive.google.com/open?id=1VEHHBBN2b-eKtvz7rgOS1F4ah0oDW76P) 
+- To generate the sample clicks for your image:
+
+## Sample clicks
+To run the sample clicks, modify the configuration file.
+Configuration File path for sample clicks: 
+cfg/config.py
+
+Carefully modify the parameters for training and testing.
+
+Run the command:
 ```bash
-python inference.py /path/to/your/image /path/to/ckpt/file
+python sample_clicks.py
 ```
 
-This will save the result with the name: 
+- Modify the configuration file at the path: 
+deeplab_resnet/config_pascal.py
+
+- To perform inference over your own images, use the following command:
+```bash
+python inference_single.py image_name SampleClick_Name model_weights_directory
+```
+The image gets saved in the default path defined in the script. Check the default model path in the script. You can pass the output directory name or model path additionally using -  
+```bash
+python inference_single.py image_name SampleClick_Name --save-dir save_directory 
+```
+
+This will save the result with the name: mask.png.
+
 
 ## Missing features
 
 The post-processing step with CRF is currently being implemented. 
-
-    
-## Other implementations
-* [DeepLab-LargeFOV in TensorFlow](https://github.com/DrSleep/tensorflow-deeplab-lfov)
