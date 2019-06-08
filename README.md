@@ -31,7 +31,7 @@ Deep Interactive Object Selection - N Xu et al., 2016 CVPR
 - positive and negative clicks
 - FCN + refinement by Graph Cut
 
-Bibtex
+Bibtex:
 If you find this code useful, please site the above two papers.
 
 
@@ -48,15 +48,20 @@ Contents:
 The code has been tested on Ubuntu and uses Python 3.6, Tensorflow.
 
 - Clone this repository 
-https://github.com/jia2lin3yuan1/deep-interactive.git
+```bash
+git clone https://github.com/jia2lin3yuan1/deep-interactive.git
+```
 
 - Setup Python environment
-
+```bash
 conda create -n objselect python==3.6 
 source activate objselect
+```
 
 To install the required python packages, run:
+```bash
 pip install tensorflow==1.12.1
+```
 
 1. cd deep-interactive/code/
 
@@ -103,7 +108,9 @@ https://github.com/tensorflow/models/blob/master/research/deeplab/datasets/downl
 ### Sample clicks
 1. To run the sample clicks, modify the configuration file.
 Configuration File path for sample clicks: 
+```bash
 cfg/config.py
+```
 
 Carefully modify the parameters for training and testing.
 
@@ -114,7 +121,9 @@ python sample_clicks.py
 
 ### Train
 Configuration File path for train file: 
+```bash
 deeplab_resnet/config_pascal.py
+```
 
 Modify the path of dataset folder.
 
@@ -140,7 +149,9 @@ An additional script, `fine_tune.py`, demonstrates how to train only the last la
 ### Sample clicks
 1. To run the sample clicks, modify the configuration file.
 Configuration File path for sample clicks: 
+```bash
 cfg/config.py
+```
 
 Carefully modify the parameters for training and testing. 
 
@@ -165,7 +176,9 @@ python evaluate.py --help
 ### Sample clicks
 1. To run the sample clicks, modify the configuration file.
 Configuration File path for sample clicks: 
+```bash
 cfg/config.py
+```
 
 2. Run the command:
 ```bash
@@ -173,7 +186,9 @@ python sample_clicks.py
 ```
 
 - Modify the configuration file at the path: 
+```bash
 deeplab_resnet/config_pascal.py
+```
 
 ### Inference
 - To perform inference over your own images, use the following command:
