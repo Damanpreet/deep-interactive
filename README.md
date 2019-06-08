@@ -101,13 +101,13 @@ https://github.com/tensorflow/models/blob/master/research/deeplab/datasets/downl
 
 
 ### Sample clicks
-To run the sample clicks, modify the configuration file.
+1. To run the sample clicks, modify the configuration file.
 Configuration File path for sample clicks: 
 cfg/config.py
 
 Carefully modify the parameters for training and testing.
 
-Run the command:
+2. Run the command:
 ```bash
 python sample_clicks.py
 ```
@@ -138,13 +138,13 @@ An additional script, `fine_tune.py`, demonstrates how to train only the last la
 - Setup the environment using the steps described above.
 
 ### Sample clicks
-To run the sample clicks, modify the configuration file.
+1. To run the sample clicks, modify the configuration file.
 Configuration File path for sample clicks: 
 cfg/config.py
 
-Carefully modify the parameters for training and testing.
+Carefully modify the parameters for training and testing. 
 
-Run the command:
+2. Run the command:
 ```bash
 python sample_clicks.py
 ```
@@ -163,13 +163,11 @@ python evaluate.py --help
 - To generate the sample clicks for your image:
 
 ### Sample clicks
-To run the sample clicks, modify the configuration file.
+1. To run the sample clicks, modify the configuration file.
 Configuration File path for sample clicks: 
 cfg/config.py
 
-Carefully modify the parameters for training and testing.
-
-Run the command:
+2. Run the command:
 ```bash
 python sample_clicks.py
 ```
@@ -182,12 +180,12 @@ deeplab_resnet/config_pascal.py
 ```bash
 python inference_single.py image_name SampleClick_Name model_weights_directory
 ```
-The image gets saved in the default path defined in the script. Check the default model path in the script. You can pass the output directory name or model path additionally using -  
+The image gets saved in the default path defined in the script. ou can pass the output directory name additionally using -  
 ```bash
 python inference_single.py image_name SampleClick_Name --save-dir save_directory 
 ```
 
-This will save the result with the name: mask.png.
+This will save the result with the name: mask.png in the output directory.
 
 
 ## Missing features
