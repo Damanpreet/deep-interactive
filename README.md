@@ -54,7 +54,7 @@ git clone https://github.com/jia2lin3yuan1/deep-interactive.git
 
 - Setup Python environment
 ```bash
-conda create -n objselect python==3.6 
+conda create -n objselect python=3.6 
 source activate objselect
 ```
 
@@ -65,7 +65,7 @@ cd deep-interactive/code/
 
 2. To install the required python packages, run:
 ```bash
-pip install tensorflow==1.12.1
+pip install tensorflow==1.12.0
 ```
 
 ```bash
