@@ -3,8 +3,7 @@
 This is an Interative Object Selection model which utilizes Deeplab-ResNet model (Deeplab v2) as 
 the backbone network. The model is trained on PASCAL VOC dataset which is publicly available online.
 
-The original implementation of the Deeplab-Resnet used in this repository is from [here].
-(https://github.com/DrSleep/tensorflow-deeplab-resnet/tree/crf)
+The original implementation of the Deeplab-Resnet is adopted from [here](https://github.com/DrSleep/tensorflow-deeplab-resnet/tree/crf).
 
 
 ## Model Description
@@ -24,7 +23,7 @@ For more details on the underlying model please refer to the following paper:
       year={2016}
     }
 
-The criterion to sample the positive and negative clicks for training and testing is taken from the paper.
+The criterion to sample the positive and negative clicks for training and testing is adopted from the paper.
 Authors: N. Xu, B. Price, S. Cohen, J. Yang, and T. S. Huang
 
 Deep Interactive Object Selection - N Xu et al., 2016 CVPR
@@ -149,18 +148,10 @@ An additional script, `fine_tune.py`, demonstrates how to train only the last la
 - Setup the environment using the steps described above.
 
 #### Sample clicks
-1. To run the sample clicks, modify the configuration file.
-Configuration File path for sample clicks: 
-```bash
-cfg/config.py
-```
+Generate the sample clicks in the same way as desribed for training.
 
 Carefully modify the parameters for training and testing. 
 
-2. Run the command:
-```bash
-python sample_clicks.py
-```
 
 #### Evaluate
 The following command provides the description of each of the evaluation settings:
@@ -176,16 +167,7 @@ python evaluate.py --help
 - To generate the sample clicks for your image:
 
 #### Sample clicks
-1. To run the sample clicks, modify the configuration file.
-Configuration File path for sample clicks: 
-```bash
-cfg/config.py
-```
-
-2. Run the command:
-```bash
-python sample_clicks.py
-```
+Generate the sample clicks in the same way as desribed for training.
 
 - Modify the configuration file at the path: 
 ```bash
@@ -197,14 +179,11 @@ deeplab_resnet/config_pascal.py
 ```bash
 python inference_single.py image_name SampleClick_Name model_weights_directory
 ```
+
+
 The image gets saved in the default path defined in the script. ou can pass the output directory name additionally using -  
 ```bash
 python inference_single.py image_name SampleClick_Name --save-dir save_directory 
 ```
 
 This will save the result with the name: mask.png in the output directory.
-
-
-## Missing features
-
-The post-processing step with CRF is currently being implemented. 
